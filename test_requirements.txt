@@ -4,5 +4,4 @@ pytest-cov
 pytest-mock
 pytest-travis-fold
 coveralls
-
-sanic
+wheel
