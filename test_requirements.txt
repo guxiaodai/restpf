@@ -1,0 +1,8 @@
+pytest>=2.7.2
+pytest-flake8
+pytest-cov
+pytest-mock
+pytest-travis-fold
+coveralls
+
+sanic
