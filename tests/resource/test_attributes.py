@@ -1,47 +1,104 @@
 from restpf.resource.attributes import (
+    NestedAttributeState,
+
     Bool,
+    BoolState,
+
     Integer,
+    IntegerState,
+
     Float,
+    FloatState,
+
     String,
+    StringState,
 
     Array,
+    ArrayState,
+
     Tuple,
+    TupleState,
+
     Object,
+    ObjectState,
 )
 
 
+def gen_attr_and_state(attrcls, statecls, attrcls_args=()):
+    to_statecls = {
+        Bool: BoolState,
+        Integer: IntegerState,
+        Float: FloatState,
+        String: StringState,
+        Array: ArrayState,
+        Tuple: TupleState,
+        Object: ObjectState,
+    }
+
+    attr = attrcls('test', *attrcls_args)
+    state = statecls(attr, to_statecls)
+    return attr, state
+
+
+def setup_state(state, value):
+    if not isinstance(state, NestedAttributeState):
+        state.bh_value = value
+    elif isinstance(state, ArrayState):
+        state._bh_children.clear()
+        for v in value:
+            child_state = state.bh_create_state('element_attr')
+            child_state.bh_value = v
+            state.bh_add_child(child_state)
+
+
+def assert_validate(state, value):
+    setup_state(state, value)
+    assert state.validate()
+
+
+def assert_not_validate(state, value):
+    setup_state(state, value)
+    assert not state.validate()
+
+
+def assert_serialize(state, value, expected):
+    setup_state(state, value)
+    assert state.serialize() == expected
+
+
 def test_bool():
-    attr = Bool('test')
+    attr, state = gen_attr_and_state(Bool, BoolState)
 
-    assert attr.validate(True)
-    assert attr.validate(False)
-    assert not attr.validate(42)
-    assert not attr.validate([True])
+    assert_validate(state, True)
+    assert_validate(state, False)
 
-    value = attr.construct(True)
-    assert value.serialize() == {
+    assert_not_validate(state, 42)
+    assert_not_validate(state, [True])
+
+    assert_serialize(state, True, {
         'type': 'bool',
         'value': True
-    }
+    })
 
 
 def test_array():
-    attr = Array('test', Integer)
+    attr, state = gen_attr_and_state(Array, ArrayState, (Integer,))
 
-    assert attr.validate([1, 2, 3])
-    assert attr.validate([True, False])
-    assert attr.validate([])
-    assert not attr.validate(42)
-    assert not attr.validate(['42'])
+    assert_validate(state, [1, 2, 3])
+    assert_validate(state, [True, False])
+    assert_validate(state, [])
 
-    value = attr.construct([1, 2, 3])
-    assert value.serialize() == {
+    assert_not_validate(state, [42.0])
+    assert_not_validate(state, ['42'])
+
+    assert_serialize(state, [1, 2, 3], {
         'type': 'array',
         'element_type': 'integer',
         'value': [1, 2, 3],
-    }
+    })
 
 
+"""
 def test_tuple():
     attr = Tuple('test', Float, String)
 
@@ -98,3 +155,4 @@ def test_object():
         'foo': {'type': 'integer', 'value': 42},
         'bar': {'type': 'string', 'value': 'test'},
     }
+"""

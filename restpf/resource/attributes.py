@@ -26,82 +26,98 @@ import collections.abc as abc
 import inspect
 
 
-class AttributeValueContainer:
-
-    def __init__(self, attr_operator, attr_value, **options):
-        self.attr_operator = attr_operator
-        self.attr_value = attr_value
-
-    def serialize(self, **options):
-        return self.attr_operator.serialize(
-            self.attr_value,
-            **options
-        )
+from .behavior_tree import (
+    BehaviorTreeNode,
+    BehaviorTreeNodeStateLeaf,
+    BehaviorTreeNodeStateNested,
+)
 
 
-class Attribute:
+class AttributeState(BehaviorTreeNodeStateLeaf):
 
     # require subclass to override.
-    TYPENAME = 'none'
+    ATTR_TYPE = 'none'
     PYTHON_TYPE = None
-    # default value container.
-    ATTRIBUTE_VALUE_CONTAINER_CLS = AttributeValueContainer
 
-    def __init__(self, name, *, nullable=False):
-        # shared settings.
-        self.name = name
-        self.nullable = nullable
+    def validate(self):
+        return isinstance(self.bh_value, self.PYTHON_TYPE)
 
-    def validate(self, value, **options):
-        return isinstance(value, self.PYTHON_TYPE)
-
-    def construct(self, value, **options):
-        return self.ATTRIBUTE_VALUE_CONTAINER_CLS(
-            self,
-            value,
-            **options
-        )
-
-    def serialize(self, value, **options):
+    def serialize(self):
         return {
-            'type': self.TYPENAME,
-            'value': value,
+            'type': self.ATTR_TYPE,
+            'value': self.bh_value,
         }
 
 
-class Bool(Attribute):
+class Attribute(BehaviorTreeNode):
 
-    TYPENAME = 'bool'
+    def __init__(self, name, *, nullable=False):
+        super().__init__()
+
+        # shared settings.
+        self.name = name
+        self.bh_rename(name)
+
+        self.nullable = nullable
+
+
+class Bool(Attribute):
+    pass
+
+
+class BoolState(AttributeState):
+
+    ATTR_TYPE = 'bool'
     PYTHON_TYPE = bool
 
 
 class Integer(Attribute):
+    pass
 
-    TYPENAME = 'integer'
+
+class IntegerState(AttributeState):
+
+    ATTR_TYPE = 'integer'
     PYTHON_TYPE = int
 
 
 class Float(Attribute):
+    pass
 
-    TYPENAME = 'float'
+
+class FloatState(AttributeState):
+
+    ATTR_TYPE = 'float'
     PYTHON_TYPE = float
 
 
 class String(Attribute):
+    pass
 
-    TYPENAME = 'string'
+
+class StringState(AttributeState):
+
+    ATTR_TYPE = 'string'
     PYTHON_TYPE = str
 
 
 class PrimitiveArray(Attribute):
+    pass
 
-    TYPENAME = 'primitive_array'
+
+class PrimitiveArrayState(AttributeState):
+
+    ATTR_TYPE = 'primitive_array'
     PYTHON_TYPE = list
 
 
 class PrimitiveObject(Attribute):
+    pass
 
-    TYPENAME = 'primitive_object'
+
+class PrimitiveObjectState(AttributeState):
+
+    ATTR_TYPE = 'primitive_object'
     PYTHON_TYPE = dict
 
 
@@ -123,16 +139,17 @@ class NestedAttribute(Attribute):
             if not isinstance(attr, Attribute):
                 raise Exception('contains non-Attribute instance')
 
-    def _transfrom_attribute_class(self, element_attrs):
+    def _transfrom_to_instances(self, element_attrs, rename_list):
         element_attrs = self._to_iterable(element_attrs)
+        assert len(element_attrs) == len(rename_list)
 
         ret = []
-        for attr in element_attrs:
+        for idx, attr in enumerate(element_attrs):
             if inspect.isclass(attr):
                 if not issubclass(attr, Attribute):
                     raise Exception('contains non-Attribute subclass')
                 else:
-                    attr = attr('anonymous')
+                    attr = attr(rename_list[idx])
             elif not isinstance(attr, Attribute):
                 raise Exception('contains non-Attribute instance')
 
@@ -140,116 +157,186 @@ class NestedAttribute(Attribute):
         return ret
 
 
+class NestedAttributeState(BehaviorTreeNodeStateNested):
+
+    @property
+    def element_attrs(self):
+        return self._bh_node._bh_children
+
+    @property
+    def element_attr_states(self):
+        return self._bh_children
+
+    @property
+    def element_named_attrs(self):
+        return self._bh_node._bh_named_children
+
+    @property
+    def element_named_attr_states(self):
+        return self._bh_named_children
+
+
 class Array(NestedAttribute):
 
-    TYPENAME = 'array'
+    ELEMENT_ATTR_NAME = 'element_attr'
 
     def __init__(self, name, element_attr, **options):
         super().__init__(name, **options)
-        self.element_attr = self._transfrom_attribute_class(element_attr)[0]
 
-    def validate(self, value, **options):
-        if not isinstance(value, list):
-            return False
+        element_attr = self._transform_element_attr_to_instance(element_attr)
+        self.bh_add_child(element_attr)
 
-        for element in value:
-            if not self.element_attr.validate(element, **options):
+    def _transform_element_attr_to_instance(self, element_attr):
+        return self._transfrom_to_instances(
+            element_attr,
+            [self.ELEMENT_ATTR_NAME],
+        )[0]
+
+    @property
+    def element_attr(self):
+        return self.bh_named_child(self.ELEMENT_ATTR_NAME)
+
+
+class ArrayState(NestedAttributeState):
+
+    ATTR_TYPE = 'array'
+
+    def validate(self):
+        element_attr_cls = self.bh_get_statecls(
+            self._bh_node.ELEMENT_ATTR_NAME,
+        )
+
+        for child_state in self.element_attr_states:
+            if type(child_state) is not element_attr_cls:
+                return False
+            if not child_state.validate():
                 return False
 
         return True
 
-    def serialize(self, value, **options):
+    def can_abbr(self):
+        if self.bh_child_size == 0:
+            return False
+        else:
+            return not isinstance(self.bh_child(), NestedAttributeState)
+
+    def element_attr_type(self):
+        return self.bh_child().ATTR_TYPE
+
+    def serialize(self):
         output_list = []
 
-        for element in value:
-            element_value = self.element_attr.serialize(element, **options)
-            if not isinstance(self.element_attr, NestedAttribute):
+        can_abbr = self.can_abbr()
+        element_attr_type = self.element_attr_type()
+
+        for child_state in self.element_attr_states:
+            element_value = child_state.serialize()
+
+            if can_abbr:
                 element_value = element_value['value']
 
             output_list.append(element_value)
 
-        ret = super().serialize(output_list)
-        if not isinstance(self.element_attr, NestedAttribute):
-            ret['element_type'] = self.element_attr.TYPENAME
+        ret = {
+            'type': self.ATTR_TYPE,
+            'value': output_list,
+        }
+        if can_abbr:
+            ret['element_type'] = element_attr_type
+
         return ret
 
 
-class Tuple(NestedAttribute):
+class Tuple(Array):
 
-    TYPENAME = 'tuple'
+    ELEMENT_ATTR_PREFIX = 'element_attr_'
 
     def __init__(self, name, *element_attrs, **options):
         super().__init__(name, **options)
-        self.element_attrs = self._transfrom_attribute_class(element_attrs)
 
-    def validate(self, value, **options):
-        if not isinstance(value, tuple):
-            return False
-        if len(value) != len(self.element_attrs):
+        rename_list = [
+            self.element_attr_name(idx)
+            for idx, _ in enumerate(element_attrs)
+        ]
+        element_attrs = self._transfrom_to_instances(
+            element_attrs, rename_list,
+        )
+
+        for attr in element_attrs:
+            self.bh_add_child(attr)
+
+    def element_attr_name(self, idx):
+        return self.ELEMENT_ATTR_PREFIX + str(idx)
+
+
+class TupleState(ArrayState):
+
+    ATTR_TYPE = 'tuple'
+
+    def can_abbr(self):
+        if self.bh_child_size == 0:
             return False
 
-        for idx, element in enumerate(value):
-            if not self.element_attrs[idx].validate(element, **options):
+        element_attr_type = self.bh_child()['type']
+        for child_state in self.element_attr_states:
+            if element_attr_type != child_state.ATTR_TYPE:
+                return False
+
+        return not isinstance(self.bh_child(), NestedAttributeState)
+
+    def validate(self):
+
+        if not isinstance(self.element_attr_states, tuple):
+            return False
+
+        if len(self.element_attrs) != len(self.element_attr_states):
+            return False
+
+        for idx, child_state in enumerate(self.element_attr_states):
+            statecls = self.bh_get_statecls(
+                self._bh_node.element_attr_name(idx),
+            )
+            if statecls is not type(child_state):
+                return False
+            if not child_state.validate():
                 return False
 
         return True
 
-    def serialize(self, value, **options):
-        can_abbr = False
-        element_type = None
-
-        attr_types = set(type(attr) for attr in self.element_attrs)
-        if len(attr_types) == 1:
-            attr_type = attr_types.pop()
-            can_abbr = not issubclass(attr_type, NestedAttribute)
-            if can_abbr:
-                element_type = attr_type.TYPENAME
-
-        output_list = []
-        for idx, element in enumerate(value):
-            element_value = self.element_attrs[idx].serialize(
-                element, **options
-            )
-            if can_abbr:
-                element_value = element_value['value']
-            output_list.append(element_value)
-
-        ret = super().serialize(output_list)
-        if can_abbr:
-            ret['element_type'] = element_type
-        return ret
-
 
 class Object(NestedAttribute):
-
-    TYPENAME = 'object'
-    PYTHON_TYPE = dict
 
     def __init__(self, name, *element_attrs, **options):
         super().__init__(name, **options)
 
         self._assert_not_contain_attribute_class(element_attrs)
-        # build mapping.
-        self.element_attrs = {}
         for attr in element_attrs:
-            self.element_attrs[attr.name] = attr
+            self.bh_add_child(attr)
 
-    def validate(self, value, **options):
-        if not super().validate(value, **options):
+
+class ObjectState(NestedAttributeState):
+
+    ATTR_TYPE = 'object'
+    PYTHON_TYPE = dict
+
+    def validate(self):
+        if (set(self.element_named_attr_states) !=
+                set(self.element_named_attrs)):
             return False
 
-        for name, attr in self.element_attrs.items():
-            if name not in value:
-                # name for exists.
+        for name, child_state in self.element_named_attr_states.items():
+            statecls = self.bh_get_statecls(name)
+
+            if statecls is not type(child_state):
                 return False
-            if not attr.validate(value[name], **options):
-                # cannot pass nesting validation.
+
+            if not child_state.validate():
                 return False
 
         return True
 
-    def serialize(self, value, **options):
+    def serialize(self):
         ret = {}
-        for name, value in value.items():
-            ret[name] = self.element_attrs[name].serialize(value, **options)
+        for name, child_state in self.element_named_attr_states.items():
+            ret[name] = child_state.serialize()
         return ret
