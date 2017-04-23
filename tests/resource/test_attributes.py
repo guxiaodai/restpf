@@ -1,5 +1,7 @@
+import pytest
+
 from restpf.resource.attributes import (
-    NestedAttributeState,
+    create_attribute_state_tree,
 
     Bool,
     BoolState,
@@ -24,8 +26,8 @@ from restpf.resource.attributes import (
 )
 
 
-def gen_attr_and_state(attrcls, statecls, attrcls_args=()):
-    to_statecls = {
+def node2statecls(node):
+    TO_STATECLS = {
         Bool: BoolState,
         Integer: IntegerState,
         Float: FloatState,
@@ -35,63 +37,55 @@ def gen_attr_and_state(attrcls, statecls, attrcls_args=()):
         Object: ObjectState,
     }
 
-    attr = attrcls('test', *attrcls_args)
-    state = statecls(attr, to_statecls)
-    return attr, state
+    return TO_STATECLS[type(node)]
 
 
-def setup_state(state, value):
-    if not isinstance(state, NestedAttributeState):
-        state.bh_value = value
-    elif isinstance(state, ArrayState):
-        state._bh_children.clear()
-        state.add_collection(value)
-    elif isinstance(state, ObjectState):
-        state._bh_children.clear()
-        state.add_named_collection(value)
+def _gen_test_result(attr, value):
+    state = create_attribute_state_tree(attr, value, node2statecls)
+    return state, state.validate(), state.serialize()
 
 
-def assert_validate(state, value):
-    setup_state(state, value)
-    assert state.validate()
+def assert_validate(attr, value):
+    _, v, _ = _gen_test_result(attr, value)
+    assert v
 
 
-def assert_not_validate(state, value):
-    setup_state(state, value)
-    assert not state.validate()
+def assert_not_validate(attr, value):
+    _, v, _ = _gen_test_result(attr, value)
+    assert not v
 
 
-def assert_serialize(state, value, expected):
-    setup_state(state, value)
-    assert state.serialize() == expected
+def assert_serialize(attr, value, expected):
+    _, _, v = _gen_test_result(attr, value)
+    assert v == expected
 
 
 def test_bool():
-    attr, state = gen_attr_and_state(Bool, BoolState)
+    attr = Bool('test')
 
-    assert_validate(state, True)
-    assert_validate(state, False)
+    assert_validate(attr, True)
+    assert_validate(attr, False)
 
-    assert_not_validate(state, 42)
-    assert_not_validate(state, [True])
+    assert_not_validate(attr, 42)
+    assert_not_validate(attr, [True])
 
-    assert_serialize(state, True, {
+    assert_serialize(attr, True, {
         'type': 'bool',
         'value': True
     })
 
 
 def test_array():
-    attr, state = gen_attr_and_state(Array, ArrayState, (Integer,))
+    attr = Array('test', Integer)
 
-    assert_validate(state, [1, 2, 3])
-    assert_validate(state, [True, False])
-    assert_validate(state, [])
+    assert_validate(attr, [1, 2, 3])
+    assert_validate(attr, [True, False])
+    assert_validate(attr, [])
 
-    assert_not_validate(state, [42.0])
-    assert_not_validate(state, ['42'])
+    assert_not_validate(attr, [42.0])
+    assert_not_validate(attr, ['42'])
 
-    assert_serialize(state, [1, 2, 3], {
+    assert_serialize(attr, [1, 2, 3], {
         'type': 'array',
         'element_type': 'integer',
         'value': [1, 2, 3],
@@ -99,14 +93,15 @@ def test_array():
 
 
 def test_tuple():
-    attr, state = gen_attr_and_state(Tuple, TupleState, (Float, String))
+    attr = Tuple('test', Float, String)
 
-    assert_validate(state, (1.0, 'test'))
+    assert_validate(attr, (1.0, 'test'))
 
-    assert_not_validate(state, (42,))
-    assert_not_validate(state, [1, 'test'])
+    with pytest.raises(RuntimeError):
+        assert_not_validate(attr, (42,))
+    assert_not_validate(attr, [1, 'test'])
 
-    assert_serialize(state, [1.0, 'test'], {
+    assert_serialize(attr, [1.0, 'test'], {
         'type': 'tuple',
         'value': [
             {'type': 'float', 'value': 1.0},
@@ -116,11 +111,9 @@ def test_tuple():
 
 
 def test_tuple_abbr_serialization():
-    attr, state = gen_attr_and_state(
-        Tuple, TupleState, (Integer, Integer, Integer),
-    )
+    attr = Tuple('test', Integer, Integer, Integer)
 
-    assert_serialize(state, [1, 2, 3], {
+    assert_serialize(attr, [1, 2, 3], {
         'type': 'tuple',
         'element_type': 'integer',
         'value': [1, 2, 3],
@@ -128,26 +121,23 @@ def test_tuple_abbr_serialization():
 
 
 def test_object():
-    attr, state = gen_attr_and_state(
-        Object, ObjectState,
-        (Integer('foo'), String('bar')),
-    )
+    attr = Object('test', Integer('foo'), String('bar'))
 
-    assert_validate(state, {
+    assert_validate(attr, {
         'foo': 42,
         'bar': 'test',
     })
 
-    assert_not_validate(state, {
+    assert_not_validate(attr, {
         'foo': '42',
         'bar': 'test',
     })
-    assert_not_validate(state, {
+    assert_not_validate(attr, {
         'bar': 'test',
     })
 
     assert_serialize(
-        state,
+        attr,
         {
             'foo': 42,
             'bar': 'test',

@@ -33,7 +33,44 @@ from .behavior_tree import (
 )
 
 
-class AttributeState(BehaviorTreeNodeStateLeaf):
+def create_attribute_state_tree(node, value, node2statecls):
+    statecls = node2statecls(node)
+
+    if statecls is None:
+        raise RuntimeError('cannot get corresponding statecls for node.')
+    if not isinstance(node, statecls.bh_nodecls):
+        raise RuntimeError('statecls is not bound to nodecls.')
+
+    return node.create_state(statecls, value, node2statecls)
+
+
+class Attribute(BehaviorTreeNode):
+
+    def __init__(self, name, *, nullable=False):
+        super().__init__()
+
+        # shared settings.
+        self.name = name
+        self.bh_rename(name)
+
+        # TODO
+        self.nullable = nullable
+
+    def create_state(self, statecls, value, node2statecls):
+        pass
+
+
+class LeafAttribute(Attribute):
+
+    def create_state(self, statecls, value, node2statecls):
+        state = statecls()
+        state.bh_value = value
+        state.bh_bind_node(self)
+
+        return state
+
+
+class LeafAttributeState(BehaviorTreeNodeStateLeaf):
 
     # require subclass to override.
     ATTR_TYPE = 'none'
@@ -47,78 +84,6 @@ class AttributeState(BehaviorTreeNodeStateLeaf):
             'type': self.ATTR_TYPE,
             'value': self.bh_value,
         }
-
-
-class Attribute(BehaviorTreeNode):
-
-    def __init__(self, name, *, nullable=False):
-        super().__init__()
-
-        # shared settings.
-        self.name = name
-        self.bh_rename(name)
-
-        self.nullable = nullable
-
-
-class Bool(Attribute):
-    pass
-
-
-class BoolState(AttributeState):
-
-    ATTR_TYPE = 'bool'
-    PYTHON_TYPE = bool
-
-
-class Integer(Attribute):
-    pass
-
-
-class IntegerState(AttributeState):
-
-    ATTR_TYPE = 'integer'
-    PYTHON_TYPE = int
-
-
-class Float(Attribute):
-    pass
-
-
-class FloatState(AttributeState):
-
-    ATTR_TYPE = 'float'
-    PYTHON_TYPE = float
-
-
-class String(Attribute):
-    pass
-
-
-class StringState(AttributeState):
-
-    ATTR_TYPE = 'string'
-    PYTHON_TYPE = str
-
-
-class PrimitiveArray(Attribute):
-    pass
-
-
-class PrimitiveArrayState(AttributeState):
-
-    ATTR_TYPE = 'primitive_array'
-    PYTHON_TYPE = list
-
-
-class PrimitiveObject(Attribute):
-    pass
-
-
-class PrimitiveObjectState(AttributeState):
-
-    ATTR_TYPE = 'primitive_object'
-    PYTHON_TYPE = dict
 
 
 class NestedAttribute(Attribute):
@@ -135,9 +100,9 @@ class NestedAttribute(Attribute):
 
         for attr in element_attrs:
             if inspect.isclass(attr):
-                raise Exception('contains Attribute class')
+                raise RuntimeError('contains Attribute class')
             if not isinstance(attr, Attribute):
-                raise Exception('contains non-Attribute instance')
+                raise RuntimeError('contains non-Attribute instance')
 
     def _transfrom_to_instances(self, element_attrs, rename_list):
         element_attrs = self._to_iterable(element_attrs)
@@ -147,39 +112,60 @@ class NestedAttribute(Attribute):
         for idx, attr in enumerate(element_attrs):
             if inspect.isclass(attr):
                 if not issubclass(attr, Attribute):
-                    raise Exception('contains non-Attribute subclass')
+                    raise RuntimeError('contains non-Attribute subclass')
                 else:
                     attr = attr(rename_list[idx])
             elif not isinstance(attr, Attribute):
-                raise Exception('contains non-Attribute instance')
+                raise RuntimeError('contains non-Attribute instance')
 
             ret.append(attr)
         return ret
+
+    def create_state(self, statecls, value, node2statecls):
+        pass
 
 
 class NestedAttributeState(BehaviorTreeNodeStateNested):
 
     @property
     def element_attrs(self):
-        return self._bh_node._bh_children
+        return self.bh_node.bh_children
 
     @property
     def element_attr_states(self):
-        return self._bh_children
+        return self.bh_children
 
     @property
     def element_named_attrs(self):
-        return self._bh_node._bh_named_children
+        return self.bh_node._bh_named_children
 
     @property
     def element_named_attr_states(self):
         return self._bh_named_children
 
-    def next_element_state(self):
-        pass
 
-    def next_named_element_state(self, name):
-        pass
+class Bool(LeafAttribute):
+    pass
+
+
+class Integer(LeafAttribute):
+    pass
+
+
+class Float(LeafAttribute):
+    pass
+
+
+class String(LeafAttribute):
+    pass
+
+
+class PrimitiveArray(LeafAttribute):
+    pass
+
+
+class PrimitiveObject(LeafAttribute):
+    pass
 
 
 class Array(NestedAttribute):
@@ -202,75 +188,25 @@ class Array(NestedAttribute):
     def element_attr(self):
         return self.bh_named_child(self.ELEMENT_ATTR_NAME)
 
+    def create_state(self, statecls, values, node2statecls):
+        assert isinstance(values, abc.Iterable)
 
-class ArrayState(NestedAttributeState):
+        element_attr = self.element_attr
 
-    ATTR_TYPE = 'array'
+        # element container.
+        state = statecls()
+        state.bh_bind_node(self)
 
-    def add_value(self, value):
-        next_state = self.next_element_state()
-        if not isinstance(next_state, NestedAttributeState):
-            next_state.bh_value = value
-            self.bh_add_child(next_state)
-        elif isinstance(value, AttributeState):
-            self.bh_add_child(value)
-        else:
-            raise 'Cannot add value'
+        # recursive construction.
+        for element_value in values:
+            element_state = create_attribute_state_tree(
+                element_attr,
+                element_value,
+                node2statecls,
+            )
+            state.bh_add_child(element_state)
 
-    def add_collection(self, iterable):
-        assert isinstance(iterable, abc.Iterable)
-        for value in iterable:
-            self.add_value(value)
-
-    def next_element_state(self):
-        return self.bh_create_state(
-            self._bh_node.ELEMENT_ATTR_NAME,
-        )
-
-    def validate(self):
-        element_attr_cls = self.bh_get_statecls(
-            self._bh_node.ELEMENT_ATTR_NAME,
-        )
-
-        for child_state in self.element_attr_states:
-            if type(child_state) is not element_attr_cls:
-                return False
-            if not child_state.validate():
-                return False
-
-        return True
-
-    def can_abbr(self):
-        if self.bh_child_size == 0:
-            return False
-        else:
-            return not isinstance(self.bh_child(), NestedAttributeState)
-
-    def element_attr_type(self):
-        return self.bh_child().ATTR_TYPE
-
-    def serialize(self):
-        output_list = []
-
-        can_abbr = self.can_abbr()
-        element_attr_type = self.element_attr_type()
-
-        for child_state in self.element_attr_states:
-            element_value = child_state.serialize()
-
-            if can_abbr:
-                element_value = element_value['value']
-
-            output_list.append(element_value)
-
-        ret = {
-            'type': self.ATTR_TYPE,
-            'value': output_list,
-        }
-        if can_abbr:
-            ret['element_type'] = element_attr_type
-
-        return ret
+        return state
 
 
 class Tuple(NestedAttribute):
@@ -294,45 +230,26 @@ class Tuple(NestedAttribute):
     def element_attr_name(self, idx):
         return self.ELEMENT_ATTR_PREFIX + str(idx)
 
+    def create_state(self, statecls, values, node2statecls):
+        assert isinstance(values, abc.Iterable)
 
-class TupleState(ArrayState):
+        if len(values) != self.bh_children_size:
+            raise RuntimeError('tuple values not matched')
 
-    ATTR_TYPE = 'tuple'
+        # tuple element container.
+        state = statecls()
+        state.bh_bind_node(self)
 
-    def next_element_state(self):
-        if self.bh_child_size >= self._bh_node.bh_child_size:
-            raise 'Cannot get next tuple element class.'
-
-        return self.bh_create_state(
-            self._bh_node.element_attr_name(self.bh_child_size),
-        )
-
-    def can_abbr(self):
-        if self.bh_child_size == 0:
-            return False
-
-        element_attr_type = self.bh_child().ATTR_TYPE
-        for child_state in self.element_attr_states:
-            if element_attr_type != child_state.ATTR_TYPE:
-                return False
-
-        return not isinstance(self.bh_child(), NestedAttributeState)
-
-    def validate(self):
-
-        if len(self.element_attrs) != len(self.element_attr_states):
-            return False
-
-        for idx, child_state in enumerate(self.element_attr_states):
-            statecls = self.bh_get_statecls(
-                self._bh_node.element_attr_name(idx),
+        # recursive construction.
+        for element_attr, element_value in zip(self.bh_children, values):
+            element_state = create_attribute_state_tree(
+                element_attr,
+                element_value,
+                node2statecls,
             )
-            if statecls is not type(child_state):
-                return False
-            if not child_state.validate():
-                return False
+            state.bh_add_child(element_state)
 
-        return True
+        return state
 
 
 class Object(NestedAttribute):
@@ -344,49 +261,188 @@ class Object(NestedAttribute):
         for attr in element_attrs:
             self.bh_add_child(attr)
 
-
-class ObjectState(NestedAttributeState):
-
-    ATTR_TYPE = 'object'
-    PYTHON_TYPE = dict
-
-    def next_named_element_state(self, name):
-        return self.bh_create_state(name)
-
-    def add_named_value(self, name, value):
-        named_state = self.next_named_element_state(name)
-        if not isinstance(named_state, NestedAttributeState):
-            named_state.bh_value = value
-            self.bh_add_child(named_state)
-        elif isinstance(value, AttributeState):
-            self.bh_add_child(value)
-        else:
-            raise 'Cannot add value'
-
-    def add_named_collection(self, mapping):
+    def create_state(self, statecls, mapping, node2statecls):
         assert isinstance(mapping, abc.Mapping)
 
-        for name, value in mapping.items():
-            self.add_named_value(name, value)
+        # object element container.
+        state = statecls()
+        state.bh_bind_node(self)
+
+        # recursive construction.
+        for element_name, element_value in mapping.items():
+            element_attr = self.bh_named_child(element_name)
+            if element_attr is None:
+                raise RuntimeError('cannot find attribute ' + element_name)
+
+            element_state = create_attribute_state_tree(
+                element_attr,
+                element_value,
+                node2statecls,
+            )
+            state.bh_add_child(element_state)
+
+        return state
+
+
+class BoolState(LeafAttributeState):
+    BH_NODECLS = Bool
+
+    ATTR_TYPE = 'bool'
+    PYTHON_TYPE = bool
+
+
+class IntegerState(LeafAttributeState):
+    BH_NODECLS = Integer
+
+    ATTR_TYPE = 'integer'
+    PYTHON_TYPE = int
+
+
+class FloatState(LeafAttributeState):
+    BH_NODECLS = Float
+
+    ATTR_TYPE = 'float'
+    PYTHON_TYPE = float
+
+
+class StringState(LeafAttributeState):
+    BH_NODECLS = String
+
+    ATTR_TYPE = 'string'
+    PYTHON_TYPE = str
+
+
+class PrimitiveArrayState(LeafAttributeState):
+    BH_NODECLS = PrimitiveArray
+
+    ATTR_TYPE = 'primitive_array'
+    PYTHON_TYPE = list
+
+
+class PrimitiveObjectState(LeafAttributeState):
+    BH_NODECLS = PrimitiveObject
+
+    ATTR_TYPE = 'primitive_object'
+    PYTHON_TYPE = dict
+
+
+class ArrayState(NestedAttributeState):
+    BH_NODECLS = Array
+
+    ATTR_TYPE = 'array'
+
+    def element_attr(self):
+        return self.bh_relative_node(
+            self.bh_nodecls.ELEMENT_ATTR_NAME,
+        )
+
+    def element_attrcls(self):
+        return self.bh_relative_nodecls(
+            self.bh_nodecls.ELEMENT_ATTR_NAME,
+        )
+
+    def element_attr_type(self):
+        if self.bh_children_size > 0:
+            return self.bh_child().ATTR_TYPE
+        else:
+            return None
+
+    def validate(self):
+        element_attrcls = self.element_attrcls()
+        for element_state in self.element_attr_states:
+            if element_state.bh_nodecls is not element_attrcls:
+                return False
+            if not element_state.validate():
+                return False
+
+        return True
+
+    def can_abbr(self):
+        if self.bh_children_size == 0:
+            return False
+        else:
+            return not isinstance(self.bh_child(), NestedAttributeState)
+
+    def serialize(self):
+        output_list = []
+
+        can_abbr = self.can_abbr()
+        element_attr_type = self.element_attr_type()
+
+        for element_state in self.element_attr_states:
+            element_value = element_state.serialize()
+
+            if can_abbr:
+                element_value = element_value['value']
+
+            output_list.append(element_value)
+
+        ret = {
+            'type': self.ATTR_TYPE,
+            'value': output_list,
+        }
+        if can_abbr:
+            ret['element_type'] = element_attr_type
+
+        return ret
+
+
+class TupleState(ArrayState):
+    BH_NODECLS = Tuple
+
+    ATTR_TYPE = 'tuple'
+
+    def can_abbr(self):
+        if self.bh_children_size == 0:
+            return False
+
+        element_attr_type = self.bh_child().ATTR_TYPE
+        for element_state in self.element_attr_states:
+            if element_attr_type != element_state.ATTR_TYPE:
+                return False
+
+        return not isinstance(self.bh_child(), NestedAttributeState)
+
+    def validate(self):
+
+        if len(self.element_attrs) != len(self.element_attr_states):
+            return False
+
+        for idx, element_state in enumerate(self.element_attr_states):
+            element_attr = self.bh_relative_nodecls(
+                self.bh_node.element_attr_name(idx),
+            )
+            if element_state.bh_nodecls is not element_attr:
+                return False
+            if not element_state.validate():
+                return False
+
+        return True
+
+
+class ObjectState(NestedAttributeState):
+    BH_NODECLS = Object
+
+    ATTR_TYPE = 'object'
 
     def validate(self):
         if (set(self.element_named_attr_states) !=
                 set(self.element_named_attrs)):
             return False
 
-        for name, child_state in self.element_named_attr_states.items():
-            statecls = self.bh_get_statecls(name)
+        for name, element_state in self.element_named_attr_states.items():
+            element_attr = self.bh_relative_nodecls(name)
 
-            if statecls is not type(child_state):
+            if element_state.bh_nodecls is not element_attr:
                 return False
 
-            if not child_state.validate():
+            if not element_state.validate():
                 return False
 
         return True
 
     def serialize(self):
         ret = {}
-        for name, child_state in self.element_named_attr_states.items():
-            ret[name] = child_state.serialize()
+        for name, element_state in self.element_named_attr_states.items():
+            ret[name] = element_state.serialize()
         return ret
