@@ -175,6 +175,12 @@ class NestedAttributeState(BehaviorTreeNodeStateNested):
     def element_named_attr_states(self):
         return self._bh_named_children
 
+    def next_element_state(self):
+        pass
+
+    def next_named_element_state(self, name):
+        pass
+
 
 class Array(NestedAttribute):
 
@@ -200,6 +206,26 @@ class Array(NestedAttribute):
 class ArrayState(NestedAttributeState):
 
     ATTR_TYPE = 'array'
+
+    def add_value(self, value):
+        next_state = self.next_element_state()
+        if not isinstance(next_state, NestedAttributeState):
+            next_state.bh_value = value
+            self.bh_add_child(next_state)
+        elif isinstance(value, AttributeState):
+            self.bh_add_child(value)
+        else:
+            raise 'Cannot add value'
+
+    def add_collection(self, iterable):
+        assert isinstance(iterable, abc.Iterable)
+        for value in iterable:
+            self.add_value(value)
+
+    def next_element_state(self):
+        return self.bh_create_state(
+            self._bh_node.ELEMENT_ATTR_NAME,
+        )
 
     def validate(self):
         element_attr_cls = self.bh_get_statecls(
@@ -247,7 +273,7 @@ class ArrayState(NestedAttributeState):
         return ret
 
 
-class Tuple(Array):
+class Tuple(NestedAttribute):
 
     ELEMENT_ATTR_PREFIX = 'element_attr_'
 
@@ -273,11 +299,19 @@ class TupleState(ArrayState):
 
     ATTR_TYPE = 'tuple'
 
+    def next_element_state(self):
+        if self.bh_child_size >= self._bh_node.bh_child_size:
+            raise 'Cannot get next tuple element class.'
+
+        return self.bh_create_state(
+            self._bh_node.element_attr_name(self.bh_child_size),
+        )
+
     def can_abbr(self):
         if self.bh_child_size == 0:
             return False
 
-        element_attr_type = self.bh_child()['type']
+        element_attr_type = self.bh_child().ATTR_TYPE
         for child_state in self.element_attr_states:
             if element_attr_type != child_state.ATTR_TYPE:
                 return False
@@ -285,9 +319,6 @@ class TupleState(ArrayState):
         return not isinstance(self.bh_child(), NestedAttributeState)
 
     def validate(self):
-
-        if not isinstance(self.element_attr_states, tuple):
-            return False
 
         if len(self.element_attrs) != len(self.element_attr_states):
             return False
@@ -318,6 +349,25 @@ class ObjectState(NestedAttributeState):
 
     ATTR_TYPE = 'object'
     PYTHON_TYPE = dict
+
+    def next_named_element_state(self, name):
+        return self.bh_create_state(name)
+
+    def add_named_value(self, name, value):
+        named_state = self.next_named_element_state(name)
+        if not isinstance(named_state, NestedAttributeState):
+            named_state.bh_value = value
+            self.bh_add_child(named_state)
+        elif isinstance(value, AttributeState):
+            self.bh_add_child(value)
+        else:
+            raise 'Cannot add value'
+
+    def add_named_collection(self, mapping):
+        assert isinstance(mapping, abc.Mapping)
+
+        for name, value in mapping.items():
+            self.add_named_value(name, value)
 
     def validate(self):
         if (set(self.element_named_attr_states) !=

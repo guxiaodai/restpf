@@ -74,6 +74,8 @@ class BehaviorTreeNodeState(BehaviorTreeNode):
         self._bh_node = node
         self._bh_to_statecls = to_statecls
 
+        self.bh_rename(node._bh_name)
+
     # def __getattr__(self, name):
     #     obj = getattr(self._bh_node, name)
     #     if not callable(obj):
@@ -83,22 +85,22 @@ class BehaviorTreeNodeState(BehaviorTreeNode):
     #         # bind to method (operation) defined in tree structure.
     #         return functools.partial(obj, self)
 
-    def bh_get_nodecls(self, *names):
+    def bh_get_node(self, *names):
         node = self._bh_node
         for name in names:
             node = node.bh_named_child(name)
             if node is None:
                 raise "cannot find name: " + name
-
-        return type(node)
+        return node
 
     def bh_get_statecls(self, *names):
-        nodecls = self.bh_get_nodecls(*names)
+        nodecls = type(self.bh_get_node(*names))
         return self._bh_to_statecls[nodecls]
 
     def bh_create_state(self, *names):
+        node = self.bh_get_node(*names)
         statecls = self.bh_get_statecls(*names)
-        return statecls(self._bh_node, self._bh_to_statecls)
+        return statecls(node, self._bh_to_statecls)
 
 
 class BehaviorTreeNodeStateLeaf(BehaviorTreeNodeState):

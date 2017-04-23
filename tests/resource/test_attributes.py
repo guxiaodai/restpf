@@ -45,10 +45,10 @@ def setup_state(state, value):
         state.bh_value = value
     elif isinstance(state, ArrayState):
         state._bh_children.clear()
-        for v in value:
-            child_state = state.bh_create_state('element_attr')
-            child_state.bh_value = v
-            state.bh_add_child(child_state)
+        state.add_collection(value)
+    elif isinstance(state, ObjectState):
+        state._bh_children.clear()
+        state.add_named_collection(value)
 
 
 def assert_validate(state, value):
@@ -98,61 +98,62 @@ def test_array():
     })
 
 
-"""
 def test_tuple():
-    attr = Tuple('test', Float, String)
+    attr, state = gen_attr_and_state(Tuple, TupleState, (Float, String))
 
-    assert attr.validate((1.0, 'test'))
-    assert not attr.validate(42)
-    assert not attr.validate([1, 'test'])
+    assert_validate(state, (1.0, 'test'))
 
-    value = attr.construct([1.0, 'test'])
-    assert value.serialize() == {
+    assert_not_validate(state, (42,))
+    assert_not_validate(state, [1, 'test'])
+
+    assert_serialize(state, [1.0, 'test'], {
         'type': 'tuple',
         'value': [
             {'type': 'float', 'value': 1.0},
             {'type': 'string', 'value': 'test'},
         ],
-    }
+    })
 
 
 def test_tuple_abbr_serialization():
-    attr = Tuple('test', Integer, Integer, Integer)
+    attr, state = gen_attr_and_state(
+        Tuple, TupleState, (Integer, Integer, Integer),
+    )
 
-    value = attr.construct([1, 2, 3])
-    assert value.serialize() == {
+    assert_serialize(state, [1, 2, 3], {
         'type': 'tuple',
         'element_type': 'integer',
         'value': [1, 2, 3],
-    }
+    })
 
 
 def test_object():
-    attr = Object(
-        'test',
-        Integer('foo'),
-        String('bar'),
+    attr, state = gen_attr_and_state(
+        Object, ObjectState,
+        (Integer('foo'), String('bar')),
     )
 
-    assert attr.validate({
+    assert_validate(state, {
         'foo': 42,
         'bar': 'test',
     })
-    assert not attr.validate(42)
-    assert not attr.validate({
+
+    assert_not_validate(state, {
         'foo': '42',
         'bar': 'test',
     })
-    assert not attr.validate({
+    assert_not_validate(state, {
         'bar': 'test',
     })
 
-    value = attr.construct({
-        'foo': 42,
-        'bar': 'test',
-    })
-    assert value.serialize() == {
-        'foo': {'type': 'integer', 'value': 42},
-        'bar': {'type': 'string', 'value': 'test'},
-    }
-"""
+    assert_serialize(
+        state,
+        {
+            'foo': 42,
+            'bar': 'test',
+        },
+        {
+            'foo': {'type': 'integer', 'value': 42},
+            'bar': {'type': 'string', 'value': 'test'},
+        },
+    )
