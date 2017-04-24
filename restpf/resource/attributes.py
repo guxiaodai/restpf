@@ -53,7 +53,6 @@ class Attribute(BehaviorTreeNode):
         self.name = name
         self.bh_rename(name)
 
-        # TODO
         self.nullable = nullable
 
     def create_state(self, statecls, value, node2statecls):

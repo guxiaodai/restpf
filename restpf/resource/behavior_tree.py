@@ -45,6 +45,10 @@ class BehaviorTreeNode:
         return self._bh_children
 
     @property
+    def bh_named_children(self):
+        return self._bh_named_children
+
+    @property
     def bh_children_size(self):
         return len(self._bh_children)
 
