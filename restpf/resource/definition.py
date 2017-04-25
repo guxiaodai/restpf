@@ -39,9 +39,9 @@ def extract_tree_structure_from_attr_obj(attr_obj, value_binder=lambda x: x):
 
 class CallbackRegistrar:
 
-    def __init__(self, attr_collection):
-        self._attr_collection = attr_collection
-        self._attr_obj = attr_collection._attr_obj
+    def __init__(self, callback_info, attr_obj):
+        self._callback_info = callback_info
+        self._attr_obj = attr_obj
 
         self.attr_path = []
         self.options = None
@@ -51,7 +51,7 @@ class CallbackRegistrar:
         if not self.attr_path:
             raise RuntimeError('empty path')
 
-        self._attr_collection.register_callback(self)
+        self._callback_info.register_callback(self)
 
     def __getattr__(self, name):
         next_attr_obj = self._attr_obj.bh_named_child(name)
@@ -80,27 +80,20 @@ class CallbackRegistrar:
             return _closure
 
 
-class AttributeCollection:
-
-    COLLECTION_NAME = None
+class CallbackInformation:
 
     _REGISTERED_CALLBACK_KEY_VALUE = 'value'
     _REGISTERED_CALLBACK_KEY_NEXT = 'next'
 
-    def __init__(self, *attrs):
-        self._attr_obj = Object(self.COLLECTION_NAME, *attrs)
-
+    def __init__(self, attr_obj):
         # [attr path] => (callback, options)
         self._registered_callback = extract_tree_structure_from_attr_obj(
-            self._attr_obj,
+            attr_obj,
             lambda x: {
                 self._REGISTERED_CALLBACK_KEY_VALUE: None,
                 self._REGISTERED_CALLBACK_KEY_NEXT: x,
             },
         )
-
-    def create_callback_registrar(self):
-        return CallbackRegistrar(self)
 
     def _locate_registered_callback_tree(self, path):
         pre_obj = None
@@ -120,7 +113,7 @@ class AttributeCollection:
             callback, options,
         )
 
-    def registered_callback_and_options(self, path):
+    def get_registered_callback_and_options(self, path):
         obj = self._locate_registered_callback_tree(path)
         last_name = path[-1]
 
@@ -132,6 +125,21 @@ class AttributeCollection:
             callback_registrar.callback,
             callback_registrar.options,
         )
+
+
+class AttributeCollection:
+
+    COLLECTION_NAME = None
+
+    def __init__(self, *attrs):
+        self._attr_obj = Object(self.COLLECTION_NAME, *attrs)
+        self._callback_info = CallbackInformation(self._attr_obj)
+
+    def create_callback_registrar(self):
+        return CallbackRegistrar(self._callback_info, self._attr_obj)
+
+    def get_registered_callback_and_options(self, path):
+        return self._callback_info.get_registered_callback_and_options(path)
 
 
 class AttributeCollectionState:

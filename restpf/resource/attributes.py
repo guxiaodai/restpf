@@ -445,3 +445,34 @@ class ObjectState(NestedAttributeState):
         for name, element_state in self.element_named_attr_states.items():
             ret[name] = element_state.serialize()
         return ret
+
+
+# TODO
+# def generate_builder(attrcls):
+#
+#     class Builder:
+#
+#         def __init__(self, *args, **kwargs):
+#             self.args = args
+#             self.kwargs = kwargs
+#             self.name = None
+#
+#         def finalize(self):
+#             if self.name is None:
+#                 raise RuntimeError('name not set')
+#
+#             return attrcls(self.name, *self.args, **self.kwargs)
+#
+#         def __repr__(self):
+#             return '<Builder: {}'.format(attrcls)
+#
+#     return Builder
+#
+#
+# BoolBuilder = generate_builder(Bool)
+# IntegerBuilder = generate_builder(Integer)
+# FloatBuilder = generate_builder(Float)
+# StringBuilder = generate_builder(String)
+# ArrayBuilder = generate_builder(Array)
+# TupleBuilder = generate_builder(Tuple)
+# ObjectBuilder = generate_builder(Object)

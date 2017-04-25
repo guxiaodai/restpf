@@ -37,7 +37,7 @@ def test_registration():
     def callback_a_b_bar():
         return 'a.b.bar'
 
-    accessor = ac.registered_callback_and_options
+    accessor = ac.get_registered_callback_and_options
 
     callback, options = accessor(['foo'])
     assert {'whatever': 42} == options
