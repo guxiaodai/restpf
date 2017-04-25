@@ -38,11 +38,27 @@ def extract_tree_structure_from_attr_obj(attr_obj, value_binder=lambda x: x):
 
 
 class CallbackRegistrar:
+    HTTP_METHOD_POST = 'POST'
+    HTTP_METHOD_GET = 'GET'
+    HTTP_METHOD_PATCH = 'PATCH'
+    HTTP_METHOD_DELETE = 'DELETE'
+    HTTP_METHOD_PUT = 'PUT'
+    HTTP_METHOD_OPTIONS = 'OPTIONS'
+
+    _AVAILABLE_CONTEXT = set([
+        HTTP_METHOD_POST,
+        HTTP_METHOD_GET,
+        HTTP_METHOD_PATCH,
+        HTTP_METHOD_DELETE,
+        HTTP_METHOD_PUT,
+        HTTP_METHOD_OPTIONS,
+    ])
 
     def __init__(self, callback_info, attr_obj):
         self._callback_info = callback_info
         self._attr_obj = attr_obj
 
+        self.context = None
         self.attr_path = []
         self.options = None
         self.callback = None
@@ -50,17 +66,29 @@ class CallbackRegistrar:
     def register(self):
         if not self.attr_path:
             raise RuntimeError('empty path')
+        if self.context is None:
+            raise RuntimeError('context not set')
 
         self._callback_info.register_callback(self)
 
     def __getattr__(self, name):
-        next_attr_obj = self._attr_obj.bh_named_child(name)
-        if next_attr_obj is None:
-            raise RuntimeError('Invalid attribute: ' + name)
+        if self.context is None:
 
-        self.attr_path.append(name)
-        self._attr_obj = next_attr_obj
-        return self
+            if name not in self._AVAILABLE_CONTEXT:
+                next_attr_obj = self._attr_obj.bh_named_child(name)
+                if next_attr_obj is None:
+                    raise RuntimeError('Invalid attribute: ' + name)
+
+                self.attr_path.append(name)
+                self._attr_obj = next_attr_obj
+            else:
+                self.context = name
+
+            return self
+        else:
+            raise RuntimeError(
+                'Context has been set, cannot get more attribute.',
+            )
 
     def __call__(self, callback=None, **kwargs):
         if callback:
@@ -69,7 +97,6 @@ class CallbackRegistrar:
                 self.register()
             else:
                 raise RuntimeError('callback is not callable.')
-
         else:
             self.options = kwargs
 
@@ -90,7 +117,7 @@ class CallbackInformation:
         self._registered_callback = extract_tree_structure_from_attr_obj(
             attr_obj,
             lambda x: {
-                self._REGISTERED_CALLBACK_KEY_VALUE: None,
+                self._REGISTERED_CALLBACK_KEY_VALUE: {},
                 self._REGISTERED_CALLBACK_KEY_NEXT: x,
             },
         )
@@ -98,30 +125,24 @@ class CallbackInformation:
     def _locate_registered_callback_tree(self, path):
         pre_obj = None
         cur_obj = self._registered_callback
-
         for name in path:
             pre_obj = cur_obj
             cur_obj = cur_obj[name][self._REGISTERED_CALLBACK_KEY_NEXT]
 
-        return pre_obj
+        return pre_obj[path[-1]][self._REGISTERED_CALLBACK_KEY_VALUE]
 
-    def _set_callback_and_options(self, path, callback, options):
+    def _set_callback_and_options(self, path, context, callback, options):
         obj = self._locate_registered_callback_tree(path)
-        last_name = path[-1]
+        obj[context] = (callback, options)
 
-        obj[last_name][self._REGISTERED_CALLBACK_KEY_VALUE] = (
-            callback, options,
-        )
-
-    def get_registered_callback_and_options(self, path):
+    def get_registered_callback_and_options(self, path, context):
         obj = self._locate_registered_callback_tree(path)
-        last_name = path[-1]
-
-        return obj[last_name][self._REGISTERED_CALLBACK_KEY_VALUE]
+        return obj.get(context)
 
     def register_callback(self, callback_registrar):
         self._set_callback_and_options(
             callback_registrar.attr_path,
+            callback_registrar.context,
             callback_registrar.callback,
             callback_registrar.options,
         )
@@ -138,8 +159,10 @@ class AttributeCollection:
     def create_callback_registrar(self):
         return CallbackRegistrar(self._callback_info, self._attr_obj)
 
-    def get_registered_callback_and_options(self, path):
-        return self._callback_info.get_registered_callback_and_options(path)
+    def get_registered_callback_and_options(self, path, context):
+        return self._callback_info.get_registered_callback_and_options(
+            path, context,
+        )
 
 
 class AttributeCollectionState:
