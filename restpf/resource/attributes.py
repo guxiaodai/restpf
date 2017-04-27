@@ -447,6 +447,21 @@ class ObjectState(NestedAttributeState):
         return ret
 
 
+def create_ist_from_bh_object(attr_obj, value_binder=lambda x: x):
+    tree = {}
+    for name, element_attr in attr_obj.bh_named_children.items():
+
+        if isinstance(element_attr, Object):
+            child_value = create_ist_from_bh_object(
+                element_attr, value_binder,
+            )
+        else:
+            child_value = None
+
+        tree[name] = value_binder(child_value)
+    return tree
+
+
 # TODO
 # def generate_builder(attrcls):
 #

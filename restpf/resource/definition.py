@@ -19,40 +19,13 @@ foo.noraml_user
 foo.username
 """
 
-from .attributes import Object
-
-
-def extract_tree_structure_from_attr_obj(attr_obj, value_binder=lambda x: x):
-    tree = {}
-    for name, element_attr in attr_obj.bh_named_children.items():
-
-        if isinstance(element_attr, Object):
-            child_value = extract_tree_structure_from_attr_obj(
-                element_attr, value_binder,
-            )
-        else:
-            child_value = None
-
-        tree[name] = value_binder(child_value)
-    return tree
+from restpf.utils.constants import ALL_HTTP_METHODS
+from .attributes import Object, create_ist_from_bh_object
 
 
 class CallbackRegistrar:
-    HTTP_METHOD_POST = 'POST'
-    HTTP_METHOD_GET = 'GET'
-    HTTP_METHOD_PATCH = 'PATCH'
-    HTTP_METHOD_DELETE = 'DELETE'
-    HTTP_METHOD_PUT = 'PUT'
-    HTTP_METHOD_OPTIONS = 'OPTIONS'
 
-    _AVAILABLE_CONTEXT = set([
-        HTTP_METHOD_POST,
-        HTTP_METHOD_GET,
-        HTTP_METHOD_PATCH,
-        HTTP_METHOD_DELETE,
-        HTTP_METHOD_PUT,
-        HTTP_METHOD_OPTIONS,
-    ])
+    _AVAILABLE_CONTEXT = set(ALL_HTTP_METHODS)
 
     def __init__(self, callback_info, attr_obj):
         self._callback_info = callback_info
@@ -114,7 +87,7 @@ class CallbackInformation:
 
     def __init__(self, attr_obj):
         # [attr path] => (callback, options)
-        self._registered_callback = extract_tree_structure_from_attr_obj(
+        self._registered_callback = create_ist_from_bh_object(
             attr_obj,
             lambda x: {
                 self._REGISTERED_CALLBACK_KEY_VALUE: {},
@@ -165,18 +138,6 @@ class AttributeCollection:
         )
 
 
-class AttributeCollectionState:
-
-    def __init__(self, attr_collection):
-        '''
-        attr_collection: instance of AttributeCollection
-        '''
-        self._attr_collection = attr_collection
-        self._state_tree = extract_tree_structure_from_attr_obj(
-            attr_collection._attr_obj,
-        )
-
-
 class Attributes(AttributeCollection):
     COLLECTION_NAME = 'attributes'
 
@@ -195,10 +156,6 @@ class Attributes(AttributeCollection):
         ...
     )
     """
-
-
-class AttributesState(AttributeCollectionState):
-    pass
 
 
 class ResourceDefinition:
