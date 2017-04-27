@@ -139,7 +139,6 @@ class AttributeCollection:
 
 
 class Attributes(AttributeCollection):
-    COLLECTION_NAME = 'attributes'
 
     """
     Attributes is a special case of Object.
@@ -157,8 +156,44 @@ class Attributes(AttributeCollection):
     )
     """
 
+    COLLECTION_NAME = 'attributes'
+
+
+class Relationships(AttributeCollection):
+
+    """
+    Attributes is a special case of Object.
+
+    Usage:
+
+    Resource(
+        ...
+        Relationships(
+            OneToOneRelationship('foo'),
+            OneToMoreRelationship('bar'),
+            ...
+        ),
+        ...
+    )
+    """
+
+    COLLECTION_NAME = 'relationships'
+
 
 class ResourceDefinition:
 
+    """
+    ResourceDefinition do not make any assumption on the attribute structure.
+    It accepts any number of Attribute and AttributeCollection. User of this
+    class should explicity mark the attribute like `type`, `id`.
+    """
+
     def __init__(self, resource_type, *option_containers):
         self.resource_type = resource_type
+
+
+class Resource(ResourceDefinition):
+
+    """
+    Special kinds of ResourceDefinition, with fixed attribute structure.
+    """
