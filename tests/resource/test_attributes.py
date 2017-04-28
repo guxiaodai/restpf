@@ -61,7 +61,7 @@ def assert_serialize(attr, value, expected):
 
 
 def test_bool():
-    attr = Bool('test')
+    attr = Bool()
 
     assert_validate(attr, True)
     assert_validate(attr, False)
@@ -76,7 +76,7 @@ def test_bool():
 
 
 def test_array():
-    attr = Array('test', Integer)
+    attr = Array(Integer)
 
     assert_validate(attr, [1, 2, 3])
     assert_validate(attr, [True, False])
@@ -93,7 +93,7 @@ def test_array():
 
 
 def test_tuple():
-    attr = Tuple('test', Float, String)
+    attr = Tuple(Float, String)
 
     assert_validate(attr, (1.0, 'test'))
 
@@ -111,7 +111,7 @@ def test_tuple():
 
 
 def test_tuple_abbr_serialization():
-    attr = Tuple('test', Integer, Integer, Integer)
+    attr = Tuple(Integer, Integer, Integer)
 
     assert_serialize(attr, [1, 2, 3], {
         'type': 'tuple',
@@ -121,7 +121,10 @@ def test_tuple_abbr_serialization():
 
 
 def test_object():
-    attr = Object('test', Integer('foo'), String('bar'))
+    attr = Object(
+        ('foo', Integer()),
+        ('bar', String()),
+    )
 
     assert_validate(attr, {
         'foo': 42,

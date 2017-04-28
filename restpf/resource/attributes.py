@@ -46,14 +46,16 @@ def create_attribute_state_tree(node, value, node2statecls):
 
 class Attribute(BehaviorTreeNode):
 
-    def __init__(self, name, *, nullable=False):
+    def __init__(self, nullable=False):
         super().__init__()
 
         # shared settings.
+        self.rename('undefined')
+        self.nullable = nullable
+
+    def rename(self, name):
         self.name = name
         self.bh_rename(name)
-
-        self.nullable = nullable
 
     def create_state(self, statecls, value, node2statecls):
         pass
@@ -113,7 +115,8 @@ class NestedAttribute(Attribute):
                 if not issubclass(attr, Attribute):
                     raise RuntimeError('contains non-Attribute subclass')
                 else:
-                    attr = attr(rename_list[idx])
+                    attr = attr()
+                    attr.rename(rename_list[idx])
             elif not isinstance(attr, Attribute):
                 raise RuntimeError('contains non-Attribute instance')
 
@@ -171,8 +174,8 @@ class Array(NestedAttribute):
 
     ELEMENT_ATTR_NAME = 'element_attr'
 
-    def __init__(self, name, element_attr, **options):
-        super().__init__(name, **options)
+    def __init__(self, element_attr, **options):
+        super().__init__(**options)
 
         element_attr = self._transform_element_attr_to_instance(element_attr)
         self.bh_add_child(element_attr)
@@ -212,8 +215,8 @@ class Tuple(NestedAttribute):
 
     ELEMENT_ATTR_PREFIX = 'element_attr_'
 
-    def __init__(self, name, *element_attrs, **options):
-        super().__init__(name, **options)
+    def __init__(self, *element_attrs, **options):
+        super().__init__(**options)
 
         rename_list = [
             self.element_attr_name(idx)
@@ -253,12 +256,31 @@ class Tuple(NestedAttribute):
 
 class Object(NestedAttribute):
 
-    def __init__(self, name, *element_attrs, **options):
-        super().__init__(name, **options)
+    def __init__(self, *named_element_attrs, **options):
+        '''
+        named_element_attrs: [ (name, element_attr), ... ]
+        '''
+
+        super().__init__(**options)
+        element_attrs = self._rename_element_attrs(named_element_attrs)
 
         self._assert_not_contain_attribute_class(element_attrs)
         for attr in element_attrs:
             self.bh_add_child(attr)
+
+    def _rename_element_attrs(self, named_element_attrs):
+        assert named_element_attrs
+        assert isinstance(named_element_attrs, abc.Iterable)
+
+        element_attrs = []
+        for pair in named_element_attrs:
+            assert len(pair) == 2
+            name, element_attr = pair
+
+            element_attr.rename(name)
+            element_attrs.append(element_attr)
+
+        return element_attrs
 
     def create_state(self, statecls, mapping, node2statecls):
         assert isinstance(mapping, abc.Mapping)

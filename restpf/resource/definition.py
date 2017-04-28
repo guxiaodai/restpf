@@ -125,8 +125,8 @@ class AttributeCollection:
 
     COLLECTION_NAME = None
 
-    def __init__(self, *attrs):
-        self._attr_obj = Object(self.COLLECTION_NAME, *attrs)
+    def __init__(self, *named_element_attrs):
+        self._attr_obj = Object(*named_element_attrs)
         self._callback_info = CallbackInformation(self._attr_obj)
 
     def create_callback_registrar(self):

@@ -9,14 +9,12 @@ from restpf.resource.definition import (
 
 def test_registration():
     ac = AttributeCollection(
-        String('foo'),
-        Object(
-            'a',
-            Object(
-                'b',
-                String('bar'),
-            ),
-        ),
+        ('foo', String()),
+        ('a', Object(
+            ('b', Object(
+                ('bar', String()),
+            )),
+        )),
     )
 
     register = ac.create_callback_registrar()
