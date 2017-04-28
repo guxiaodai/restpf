@@ -150,3 +150,15 @@ def test_object():
             'bar': {'type': 'string', 'value': 'test'},
         },
     )
+
+
+def test_object_mapping_constructor():
+    attr = Object({
+        'foo': Integer,
+        'bar': String,
+    })
+
+    assert_validate(attr, {
+        'foo': 42,
+        'bar': 'test',
+    })

@@ -31,6 +31,10 @@ class BehaviorTreeNode:
     def bh_rename(self, name):
         self._bh_name = name
 
+    @property
+    def bh_name(self):
+        return self._bh_name
+
     def bh_add_child(self, child):
         assert isinstance(child, BehaviorTreeNode)
 

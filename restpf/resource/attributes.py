@@ -31,6 +31,7 @@ from .behavior_tree import (
     BehaviorTreeNodeStateLeaf,
     BehaviorTreeNodeStateNested,
 )
+from restpf.utils.helper_functions import to_iterable
 
 
 def create_attribute_state_tree(node, value, node2statecls):
@@ -44,6 +45,59 @@ def create_attribute_state_tree(node, value, node2statecls):
     return node.create_state(statecls, value, node2statecls)
 
 
+def create_ist_from_bh_object(attr_obj, value_binder=lambda x: x):
+    tree = {}
+    for name, element_attr in attr_obj.bh_named_children.items():
+
+        if isinstance(element_attr, Object):
+            child_value = create_ist_from_bh_object(
+                element_attr, value_binder,
+            )
+        else:
+            child_value = None
+
+        tree[name] = value_binder(child_value)
+    return tree
+
+
+def assert_not_contain_attribute_class(element_attrs):
+    element_attrs = to_iterable(element_attrs)
+
+    for attr in element_attrs:
+        if inspect.isclass(attr):
+            raise RuntimeError('contains Attribute class')
+        if not isinstance(attr, Attribute):
+            raise RuntimeError('contains non-Attribute instance')
+
+
+def transfrom_to_attribute_states(element_attrs, rename_list):
+    element_attrs = to_iterable(element_attrs)
+    assert len(element_attrs) == len(rename_list)
+
+    ret = []
+    for attr, name in zip(element_attrs, rename_list):
+        if inspect.isclass(attr):
+            if not issubclass(attr, Attribute):
+                raise RuntimeError('contains non-Attribute subclass')
+            else:
+                attr = attr()
+        elif not isinstance(attr, Attribute):
+            raise RuntimeError('contains non-Attribute instance')
+
+        attr.rename(name)
+        ret.append(attr)
+    return ret
+
+
+def transfrom_mapping_to_attribute_states(name2attr):
+    assert isinstance(name2attr, abc.Mapping)
+
+    rename_list = list(name2attr.keys())
+    element_attrs = [name2attr[name] for name in rename_list]
+
+    return transfrom_to_attribute_states(element_attrs, rename_list)
+
+
 class Attribute(BehaviorTreeNode):
 
     def __init__(self, nullable=False):
@@ -54,8 +108,11 @@ class Attribute(BehaviorTreeNode):
         self.nullable = nullable
 
     def rename(self, name):
-        self.name = name
         self.bh_rename(name)
+
+    @property
+    def name(self):
+        return self.bh_name
 
     def create_state(self, statecls, value, node2statecls):
         pass
@@ -88,40 +145,6 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
 
 
 class NestedAttribute(Attribute):
-
-    def _to_iterable(self, element):
-        assert element
-
-        if not isinstance(element, abc.Iterable):
-            element = (element,)
-        return element
-
-    def _assert_not_contain_attribute_class(self, element_attrs):
-        element_attrs = self._to_iterable(element_attrs)
-
-        for attr in element_attrs:
-            if inspect.isclass(attr):
-                raise RuntimeError('contains Attribute class')
-            if not isinstance(attr, Attribute):
-                raise RuntimeError('contains non-Attribute instance')
-
-    def _transfrom_to_instances(self, element_attrs, rename_list):
-        element_attrs = self._to_iterable(element_attrs)
-        assert len(element_attrs) == len(rename_list)
-
-        ret = []
-        for idx, attr in enumerate(element_attrs):
-            if inspect.isclass(attr):
-                if not issubclass(attr, Attribute):
-                    raise RuntimeError('contains non-Attribute subclass')
-                else:
-                    attr = attr()
-                    attr.rename(rename_list[idx])
-            elif not isinstance(attr, Attribute):
-                raise RuntimeError('contains non-Attribute instance')
-
-            ret.append(attr)
-        return ret
 
     def create_state(self, statecls, value, node2statecls):
         pass
@@ -181,9 +204,8 @@ class Array(NestedAttribute):
         self.bh_add_child(element_attr)
 
     def _transform_element_attr_to_instance(self, element_attr):
-        return self._transfrom_to_instances(
-            element_attr,
-            [self.ELEMENT_ATTR_NAME],
+        return transfrom_to_attribute_states(
+            element_attr, [self.ELEMENT_ATTR_NAME],
         )[0]
 
     @property
@@ -222,7 +244,7 @@ class Tuple(NestedAttribute):
             self.element_attr_name(idx)
             for idx, _ in enumerate(element_attrs)
         ]
-        element_attrs = self._transfrom_to_instances(
+        element_attrs = transfrom_to_attribute_states(
             element_attrs, rename_list,
         )
 
@@ -258,29 +280,28 @@ class Object(NestedAttribute):
 
     def __init__(self, *named_element_attrs, **options):
         '''
-        named_element_attrs: [ (name, element_attr), ... ]
+        form 1:
+        named_element_attrs: { name: attr, ... }
+
+        form 2:
+        named_element_attrs: (name, element_attr), ...
         '''
 
         super().__init__(**options)
-        element_attrs = self._rename_element_attrs(named_element_attrs)
 
-        self._assert_not_contain_attribute_class(element_attrs)
+        if len(named_element_attrs) == 1 and \
+                isinstance(named_element_attrs[0], abc.Mapping):
+            # form 1.
+            element_attrs = transfrom_mapping_to_attribute_states(
+                named_element_attrs[0],
+            )
+        else:
+            # form 2.
+            name2attr = dict(named_element_attrs)
+            element_attrs = transfrom_mapping_to_attribute_states(name2attr)
+
         for attr in element_attrs:
             self.bh_add_child(attr)
-
-    def _rename_element_attrs(self, named_element_attrs):
-        assert named_element_attrs
-        assert isinstance(named_element_attrs, abc.Iterable)
-
-        element_attrs = []
-        for pair in named_element_attrs:
-            assert len(pair) == 2
-            name, element_attr = pair
-
-            element_attr.rename(name)
-            element_attrs.append(element_attr)
-
-        return element_attrs
 
     def create_state(self, statecls, mapping, node2statecls):
         assert isinstance(mapping, abc.Mapping)
@@ -467,21 +488,6 @@ class ObjectState(NestedAttributeState):
         for name, element_state in self.element_named_attr_states.items():
             ret[name] = element_state.serialize()
         return ret
-
-
-def create_ist_from_bh_object(attr_obj, value_binder=lambda x: x):
-    tree = {}
-    for name, element_attr in attr_obj.bh_named_children.items():
-
-        if isinstance(element_attr, Object):
-            child_value = create_ist_from_bh_object(
-                element_attr, value_binder,
-            )
-        else:
-            child_value = None
-
-        tree[name] = value_binder(child_value)
-    return tree
 
 
 # TODO
