@@ -25,6 +25,8 @@ from restpf.resource.attributes import (
     ObjectState,
 )
 
+from restpf.utils.constants import GET, POST
+
 
 def node2statecls(node):
     TO_STATECLS = {
@@ -162,3 +164,10 @@ def test_object_mapping_constructor():
         'foo': 42,
         'bar': 'test',
     })
+
+
+def test_nullable():
+    String(nullable=[POST, GET])
+    String(nullable=None)
+    with pytest.raises(AssertionError):
+        String(nullable=['wrong'])

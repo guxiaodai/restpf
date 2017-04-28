@@ -1,5 +1,5 @@
 """
-Defines the primitive fields.
+Defines the primitive attributes.
 
 Primitive Types:
 
@@ -8,9 +8,9 @@ Primitive Types:
 - float
 - string
 
-- datetime
-- interval
-- duration
+- datetime (TODO)
+- interval (TODO)
+- duration (TODO)
 
 - primitive_array
 - primitive_object
@@ -20,18 +20,32 @@ Nested Types:
 - array[T]
 - tuple[T, ...]
 - object[named T, ...]
+
+
+Common configuration for attributes:
+
+- name: [string] Name of the attribute.
+- nullable: [a list of http methods].
+    - GET: corresponding value in IST is allowed to be null.
+    - POST: it's ok to not post this attribute for resource creation.
+    - PUT: same as POST.
+    - PATCH: similar to POST. notice, attributes are nullable in PATCH by
+    default, except for some special attributes like id and type.
+    - OPTIONS: might have something to do with definition exporting. (TODO)
+    - DELETE: not support.
 """
 
 import collections.abc as abc
 import inspect
 
 
+from restpf.utils.constants import ALL_HTTP_METHODS
+from restpf.utils.helper_functions import to_iterable
 from .behavior_tree import (
     BehaviorTreeNode,
     BehaviorTreeNodeStateLeaf,
     BehaviorTreeNodeStateNested,
 )
-from restpf.utils.helper_functions import to_iterable
 
 
 def create_attribute_state_tree(node, value, node2statecls):
@@ -100,12 +114,25 @@ def transfrom_mapping_to_attribute_states(name2attr):
 
 class Attribute(BehaviorTreeNode):
 
-    def __init__(self, nullable=False):
+    def __init__(self, nullable=[]):
         super().__init__()
 
         # shared settings.
         self.rename('undefined')
-        self.nullable = nullable
+        self._init_nullable(nullable)
+
+    def _init_nullable(self, nullable):
+        self.nullable = set()
+
+        if not nullable:
+            # passing None is ok.
+            return
+        # should be iterable.
+        assert isinstance(nullable, abc.Iterable)
+
+        for http_method in nullable:
+            assert http_method in ALL_HTTP_METHODS
+            self.nullable.add(http_method)
 
     def rename(self, name):
         self.bh_rename(name)

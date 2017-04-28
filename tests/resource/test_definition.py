@@ -58,3 +58,15 @@ def test_registration():
     callback, options = accessor(['a', 'b', 'bar'], 'PATCH')
     assert None is options
     assert 'a.b.bar' == callback()
+
+
+def test_registration_by_dict():
+    ac = AttributeCollection({
+        'foo': String,
+        'a': Object({
+            'b': Object({
+                'bar': String,
+            }),
+        }),
+    })
+    assert ac
