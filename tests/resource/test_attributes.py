@@ -185,10 +185,26 @@ def test_value_property():
 
 def test_array_getitem():
     attr = Array(Integer)
-    state, _, _ = _gen_test_result(attr, [1, 2, 3])
+    state, _, _ = _gen_test_result(attr, [1, 2, 3, 4])
+    # len.
+    assert len(state) == 4
+    # int.
     assert state[0].value == 1
     assert state[1].value == 2
     assert state[2].value == 3
+    assert state[3].value == 4
+    # slice.
+    mid = state[1:3]
+    assert mid[0].value == 2
+    assert mid[1].value == 3
+
+
+def test_array_iterable():
+    attr = Array(Integer)
+    state, _, _ = _gen_test_result(attr, [1, 2, 3])
+    assert list(map(lambda x: x.value, state)) == [1, 2, 3]
+    for obj, value in zip(state, [1, 2, 3]):
+        assert obj.value == value
 
 
 def test_object_getattr():

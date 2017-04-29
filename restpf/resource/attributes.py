@@ -460,10 +460,16 @@ class ArrayState(NestedAttributeState):
         return ret
 
     def __getitem__(self, key):
-        assert isinstance(key, int)
-        assert key < self.bh_children_size
+        if isinstance(key, (int, slice)):
+            return self.bh_child(key)
+        else:
+            raise RuntimeError('wrong type')
 
-        return self.bh_child(key)
+    def __len__(self):
+        return self.bh_children_size
+
+    def __iter__(self):
+        return iter(self.bh_children)
 
 
 class TupleState(ArrayState):
