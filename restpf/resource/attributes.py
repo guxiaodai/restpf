@@ -170,6 +170,10 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
             'value': self.bh_value,
         }
 
+    @property
+    def value(self):
+        return self.bh_value
+
 
 class NestedAttribute(Attribute):
 
@@ -455,6 +459,12 @@ class ArrayState(NestedAttributeState):
 
         return ret
 
+    def __getitem__(self, key):
+        assert isinstance(key, int)
+        assert key < self.bh_children_size
+
+        return self.bh_child(key)
+
 
 class TupleState(ArrayState):
     BH_NODECLS = Tuple
@@ -515,6 +525,14 @@ class ObjectState(NestedAttributeState):
         for name, element_state in self.element_named_attr_states.items():
             ret[name] = element_state.serialize()
         return ret
+
+    def get(self, name):
+        return self.__getattr__(name)
+
+    def __getattr__(self, name):
+        child = self.bh_named_child(name)
+        assert child
+        return child
 
 
 # TODO

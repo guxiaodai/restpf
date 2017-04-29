@@ -171,3 +171,38 @@ def test_nullable():
     String(nullable=None)
     with pytest.raises(AssertionError):
         String(nullable=['wrong'])
+
+
+def test_value_property():
+    attr = Bool()
+    state, _, _ = _gen_test_result(attr, False)
+    assert state.value is False
+
+    attr = Integer()
+    state, _, _ = _gen_test_result(attr, 42)
+    assert state.value == 42
+
+
+def test_array_getitem():
+    attr = Array(Integer)
+    state, _, _ = _gen_test_result(attr, [1, 2, 3])
+    assert state[0].value == 1
+    assert state[1].value == 2
+    assert state[2].value == 3
+
+
+def test_object_getattr():
+    attr = Object({
+        'foo': Integer,
+        'bar': String,
+        'not an identifier': Integer,
+    })
+
+    state, _, _ = _gen_test_result(attr, {
+        'foo': 42,
+        'bar': 'test',
+        'not an identifier': 42,
+    })
+    assert state.foo.value == 42
+    assert state.bar.value == 'test'
+    assert state.get('not an identifier').value == 42
