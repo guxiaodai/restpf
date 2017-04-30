@@ -6,7 +6,9 @@ class ContextRule:
 
 
 class IntermediateStateTreeBuilder:
-    pass
+
+    def build_ist(self, state_tree):
+        pass
 
 
 class IntermediateStateTreeCollector:
