@@ -18,6 +18,16 @@ from .behavior_tree import (
 
 
 def create_attribute_state_tree(node, value, node2statecls):
+
+    '''
+    1. Attribute classes has nothing to do with side effect, including building
+    nodes and consuming input value.
+    2. Multiple state classes could be associated to an Attribute class,
+    leading to different behavior for a single structure.
+    3. State.init_state should consume the entire input value. Kind of top-down
+    parsing structure.
+    '''
+
     statecls = node2statecls(node)
 
     if statecls is None:
@@ -65,12 +75,19 @@ class NestedAttributeState(BehaviorTreeNodeStateNested):
         return self.bh_node.bh_children
 
     @property
+    def element_attr_size(self):
+        return self.bh_node.bh_children_size
+
+    @property
     def element_attr_states(self):
         return self.bh_children
 
     @property
     def element_named_attrs(self):
         return self.bh_node._bh_named_children
+
+    def element_named_attr(self, name):
+        return self.bh_node.bh_named_child(name)
 
     @property
     def element_named_attr_states(self):
@@ -225,15 +242,17 @@ class TupleStateForOutputDefault(ArrayStateForOutputDefault):
 
         return not isinstance(self.bh_child(), NestedAttributeState)
 
+    def element_attr_name(self, idx):
+        return self.bh_node.element_attr_name(idx)
+
     def init_state(self, values, node2statecls):
         assert isinstance(values, abc.Iterable)
 
-        if len(values) != self.bh_node.bh_children_size:
+        if len(values) != self.element_attr_size:
             raise RuntimeError('tuple values not matched')
 
         # recursive construction.
-        for element_attr, element_value in zip(self.bh_node.bh_children,
-                                               values):
+        for element_attr, element_value in zip(self.element_attrs, values):
             element_state = create_attribute_state_tree(
                 element_attr,
                 element_value,
@@ -248,7 +267,7 @@ class TupleStateForOutputDefault(ArrayStateForOutputDefault):
 
         for idx, element_state in enumerate(self.element_attr_states):
             element_attr = self.bh_relative_nodecls(
-                self.bh_node.element_attr_name(idx),
+                self.element_attr_name(idx),
             )
             if element_state.bh_nodecls is not element_attr:
                 return False
@@ -268,7 +287,7 @@ class ObjectStateForOutputDefault(NestedAttributeState):
 
         # recursive construction.
         for element_name, element_value in mapping.items():
-            element_attr = self.bh_node.bh_named_child(element_name)
+            element_attr = self.element_named_attr(element_name)
             if element_attr is None:
                 raise RuntimeError('cannot find attribute ' + element_name)
 

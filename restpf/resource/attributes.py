@@ -38,12 +38,9 @@ Common configuration for attributes:
 import collections.abc as abc
 import inspect
 
-
 from restpf.utils.constants import ALL_HTTP_METHODS
 from restpf.utils.helper_functions import to_iterable
-from .behavior_tree import (
-    BehaviorTreeNode,
-)
+from .behavior_tree import BehaviorTreeNode
 
 
 def create_ist_from_bh_object(attr_obj, value_binder=lambda x: x):
