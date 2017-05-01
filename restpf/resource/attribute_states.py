@@ -18,7 +18,6 @@ from .behavior_tree import (
 
 
 def create_attribute_state_tree(node, value, node2statecls):
-
     '''
     1. Attribute classes has nothing to do with side effect, including building
     nodes and consuming input value.
@@ -52,10 +51,23 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
     PYTHON_TYPE = None
 
     def init_state(self, value, node2statecls):
-        self.bh_value = value
+        raise NotImplemented
 
     def validate(self):
         return isinstance(self.bh_value, self.PYTHON_TYPE)
+
+    def serialize(self):
+        raise NotImplemented
+
+    @property
+    def value(self):
+        return self.bh_value
+
+
+class LeafAttributeOutputState(LeafAttributeState):
+
+    def init_state(self, value, node2statecls):
+        self.bh_value = value
 
     def serialize(self):
         return {
@@ -63,9 +75,19 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
             'value': self.bh_value,
         }
 
-    @property
-    def value(self):
-        return self.bh_value
+
+class LeafAttributeInputState(LeafAttributeState):
+
+    '''
+    InputState don't need to implement serialize.
+    '''
+
+    def init_state(self, value, node2statecls):
+        if isinstance(value, abc.Mapping):
+            assert value['type'] == self.ATTR_TYPE
+            self.bh_value = value['value']
+        else:
+            self.bh_value = value
 
 
 class NestedAttributeState(BehaviorTreeNodeStateNested):
@@ -97,52 +119,109 @@ class NestedAttributeState(BehaviorTreeNodeStateNested):
         pass
 
 
-class BoolStateForOutputDefault(LeafAttributeState):
+class BoolStateConfig:
     BH_NODECLS = Bool
 
     ATTR_TYPE = 'bool'
     PYTHON_TYPE = bool
 
 
-class IntegerStateForOutputDefault(LeafAttributeState):
+class BoolStateForOutputDefault(BoolStateConfig, LeafAttributeOutputState):
+    pass
+
+
+class BoolStateForInputDefault(BoolStateConfig, LeafAttributeInputState):
+    pass
+
+
+class IntegerStateConfig:
     BH_NODECLS = Integer
 
     ATTR_TYPE = 'integer'
     PYTHON_TYPE = int
 
 
-class FloatStateForOutputDefault(LeafAttributeState):
+class IntegerStateForOutputDefault(IntegerStateConfig,
+                                   LeafAttributeOutputState):
+    pass
+
+
+class IntegerStateForInputDefault(IntegerStateConfig,
+                                  LeafAttributeInputState):
+    pass
+
+
+class FloatStateConfig:
     BH_NODECLS = Float
 
     ATTR_TYPE = 'float'
     PYTHON_TYPE = float
 
 
-class StringStateForOutputDefault(LeafAttributeState):
+class FloatStateForOutputDefault(FloatStateConfig, LeafAttributeOutputState):
+    pass
+
+
+class FloatStateForInputDefault(FloatStateConfig, LeafAttributeInputState):
+    pass
+
+
+class StringStateConfig:
     BH_NODECLS = String
 
     ATTR_TYPE = 'string'
     PYTHON_TYPE = str
 
 
-class PrimitiveArrayStateForOutputDefault(LeafAttributeState):
+class StringStateForOutputDefault(StringStateConfig, LeafAttributeOutputState):
+    pass
+
+
+class StringStateForInputDefault(StringStateConfig, LeafAttributeInputState):
+    pass
+
+
+class PrimitiveArrayStateConfig:
     BH_NODECLS = PrimitiveArray
 
     ATTR_TYPE = 'primitive_array'
     PYTHON_TYPE = list
 
 
-class PrimitiveObjectStateForOutputDefault(LeafAttributeState):
+class PrimitiveArrayStateForOutputDefault(PrimitiveArrayStateConfig,
+                                          LeafAttributeOutputState):
+    pass
+
+
+class PrimitiveArrayStateForInputDefault(PrimitiveArrayStateConfig,
+                                         LeafAttributeInputState):
+    pass
+
+
+class PrimitiveObjectStateConfig:
     BH_NODECLS = PrimitiveObject
 
     ATTR_TYPE = 'primitive_object'
     PYTHON_TYPE = dict
 
 
-class ArrayStateForOutputDefault(NestedAttributeState):
+class PrimitiveObjectStateForOutputDefault(PrimitiveArrayStateConfig,
+                                           LeafAttributeOutputState):
+    pass
+
+
+class PrimitiveObjectStateForInputDefault(PrimitiveObjectStateConfig,
+                                          LeafAttributeInputState):
+    pass
+
+
+class ArrayStateConfig:
     BH_NODECLS = Array
 
     ATTR_TYPE = 'array'
+
+
+class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
 
     def element_attr(self):
         return self.bh_relative_node(
@@ -166,7 +245,29 @@ class ArrayStateForOutputDefault(NestedAttributeState):
         else:
             return not isinstance(self.bh_child(), NestedAttributeState)
 
-    def init_state(self, values, node2statecls):
+    def validate(self):
+        element_attrcls = self.element_attrcls()
+        for element_state in self.element_attr_states:
+            if element_state.bh_nodecls is not element_attrcls:
+                return False
+            if not element_state.validate():
+                return False
+
+        return True
+
+    def __getitem__(self, key):
+        if isinstance(key, (int, slice)):
+            return self.bh_child(key)
+        else:
+            raise RuntimeError('wrong type')
+
+    def __len__(self):
+        return self.bh_children_size
+
+    def __iter__(self):
+        return iter(self.bh_children)
+
+    def _init_state_for_list(self, values, node2statecls):
         assert isinstance(values, abc.Iterable)
 
         element_attr = self.element_attr()
@@ -180,15 +281,11 @@ class ArrayStateForOutputDefault(NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
-        element_attrcls = self.element_attrcls()
-        for element_state in self.element_attr_states:
-            if element_state.bh_nodecls is not element_attrcls:
-                return False
-            if not element_state.validate():
-                return False
 
-        return True
+class ArrayStateForOutputDefault(ArrayStateCommon):
+
+    def init_state(self, values, node2statecls):
+        self._init_state_for_list(values, node2statecls)
 
     def serialize(self):
         output_list = []
@@ -213,23 +310,24 @@ class ArrayStateForOutputDefault(NestedAttributeState):
 
         return ret
 
-    def __getitem__(self, key):
-        if isinstance(key, (int, slice)):
-            return self.bh_child(key)
+
+class ArrayStateForInputDefault(ArrayStateCommon):
+
+    def init_state(self, values, node2statecls):
+        if isinstance(values, abc.Mapping):
+            assert values['type'] == self.ATTR_TYPE
+            self._init_state_for_list(values['value'], node2statecls)
         else:
-            raise RuntimeError('wrong type')
-
-    def __len__(self):
-        return self.bh_children_size
-
-    def __iter__(self):
-        return iter(self.bh_children)
+            self._init_state_for_list(values, node2statecls)
 
 
-class TupleStateForOutputDefault(ArrayStateForOutputDefault):
+class TupleStateConfig:
     BH_NODECLS = Tuple
 
     ATTR_TYPE = 'tuple'
+
+
+class TupleStateCommon(TupleStateConfig):
 
     def can_abbr(self):
         if self.bh_children_size == 0:
@@ -245,7 +343,7 @@ class TupleStateForOutputDefault(ArrayStateForOutputDefault):
     def element_attr_name(self, idx):
         return self.bh_node.element_attr_name(idx)
 
-    def init_state(self, values, node2statecls):
+    def _init_state_for_list(self, values, node2statecls):
         assert isinstance(values, abc.Iterable)
 
         if len(values) != self.element_attr_size:
@@ -259,6 +357,12 @@ class TupleStateForOutputDefault(ArrayStateForOutputDefault):
                 node2statecls,
             )
             self.bh_add_child(element_state)
+
+
+class TupleStateForOutputDefault(TupleStateCommon, ArrayStateForOutputDefault):
+
+    def init_state(self, values, node2statecls):
+        self._init_state_for_list(values, node2statecls)
 
     def validate(self):
 
@@ -277,10 +381,22 @@ class TupleStateForOutputDefault(ArrayStateForOutputDefault):
         return True
 
 
-class ObjectStateForOutputDefault(NestedAttributeState):
+class TupleStateForInputDefault(TupleStateCommon, ArrayStateForInputDefault):
+
+    '''
+    Don't need to override anything, since _init_state_for_list has already
+    been override in TupleStateCommon.
+    '''
+    pass
+
+
+class ObjectStateConfig:
     BH_NODECLS = Object
 
     ATTR_TYPE = 'object'
+
+
+class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
 
     def init_state(self, mapping, node2statecls):
         assert isinstance(mapping, abc.Mapping)
@@ -314,12 +430,6 @@ class ObjectStateForOutputDefault(NestedAttributeState):
 
         return True
 
-    def serialize(self):
-        ret = {}
-        for name, element_state in self.element_named_attr_states.items():
-            ret[name] = element_state.serialize()
-        return ret
-
     def get(self, name):
         return self.__getattr__(name)
 
@@ -329,32 +439,19 @@ class ObjectStateForOutputDefault(NestedAttributeState):
         return child
 
 
-# TODO
-# def generate_builder(attrcls):
-#
-#     class Builder:
-#
-#         def __init__(self, *args, **kwargs):
-#             self.args = args
-#             self.kwargs = kwargs
-#             self.name = None
-#
-#         def finalize(self):
-#             if self.name is None:
-#                 raise RuntimeError('name not set')
-#
-#             return attrcls(self.name, *self.args, **self.kwargs)
-#
-#         def __repr__(self):
-#             return '<Builder: {}'.format(attrcls)
-#
-#     return Builder
-#
-#
-# BoolBuilder = generate_builder(Bool)
-# IntegerBuilder = generate_builder(Integer)
-# FloatBuilder = generate_builder(Float)
-# StringBuilder = generate_builder(String)
-# ArrayBuilder = generate_builder(Array)
-# TupleBuilder = generate_builder(Tuple)
-# ObjectBuilder = generate_builder(Object)
+class ObjectStateForOutputDefault(ObjectStateCommon):
+
+    def serialize(self):
+        ret = {}
+        for name, element_state in self.element_named_attr_states.items():
+            ret[name] = element_state.serialize()
+        return ret
+
+
+class ObjectStateForInputDefault(ObjectStateCommon):
+
+    '''
+    Both ObjectStateForInputDefault and ObjectStateForOutputDefault should use
+    the same way to construct the state.
+    '''
+    pass
