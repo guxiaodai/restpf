@@ -296,49 +296,49 @@ class Object(NestedAttribute):
             self.bh_add_child(attr)
 
 
-class BoolState(LeafAttributeState):
+class BoolStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = Bool
 
     ATTR_TYPE = 'bool'
     PYTHON_TYPE = bool
 
 
-class IntegerState(LeafAttributeState):
+class IntegerStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = Integer
 
     ATTR_TYPE = 'integer'
     PYTHON_TYPE = int
 
 
-class FloatState(LeafAttributeState):
+class FloatStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = Float
 
     ATTR_TYPE = 'float'
     PYTHON_TYPE = float
 
 
-class StringState(LeafAttributeState):
+class StringStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = String
 
     ATTR_TYPE = 'string'
     PYTHON_TYPE = str
 
 
-class PrimitiveArrayState(LeafAttributeState):
+class PrimitiveArrayStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = PrimitiveArray
 
     ATTR_TYPE = 'primitive_array'
     PYTHON_TYPE = list
 
 
-class PrimitiveObjectState(LeafAttributeState):
+class PrimitiveObjectStateForOutputDefault(LeafAttributeState):
     BH_NODECLS = PrimitiveObject
 
     ATTR_TYPE = 'primitive_object'
     PYTHON_TYPE = dict
 
 
-class ArrayState(NestedAttributeState):
+class ArrayStateForOutputDefault(NestedAttributeState):
     BH_NODECLS = Array
 
     ATTR_TYPE = 'array'
@@ -425,7 +425,7 @@ class ArrayState(NestedAttributeState):
         return iter(self.bh_children)
 
 
-class TupleState(ArrayState):
+class TupleStateForOutputDefault(ArrayStateForOutputDefault):
     BH_NODECLS = Tuple
 
     ATTR_TYPE = 'tuple'
@@ -474,7 +474,7 @@ class TupleState(ArrayState):
         return True
 
 
-class ObjectState(NestedAttributeState):
+class ObjectStateForOutputDefault(NestedAttributeState):
     BH_NODECLS = Object
 
     ATTR_TYPE = 'object'

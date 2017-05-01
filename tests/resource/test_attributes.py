@@ -4,25 +4,25 @@ from restpf.resource.attributes import (
     create_attribute_state_tree,
 
     Bool,
-    BoolState,
+    BoolStateForOutputDefault,
 
     Integer,
-    IntegerState,
+    IntegerStateForOutputDefault,
 
     Float,
-    FloatState,
+    FloatStateForOutputDefault,
 
     String,
-    StringState,
+    StringStateForOutputDefault,
 
     Array,
-    ArrayState,
+    ArrayStateForOutputDefault,
 
     Tuple,
-    TupleState,
+    TupleStateForOutputDefault,
 
     Object,
-    ObjectState,
+    ObjectStateForOutputDefault,
 )
 
 from restpf.utils.constants import GET, POST
@@ -30,13 +30,13 @@ from restpf.utils.constants import GET, POST
 
 def node2statecls(node):
     TO_STATECLS = {
-        Bool: BoolState,
-        Integer: IntegerState,
-        Float: FloatState,
-        String: StringState,
-        Array: ArrayState,
-        Tuple: TupleState,
-        Object: ObjectState,
+        Bool: BoolStateForOutputDefault,
+        Integer: IntegerStateForOutputDefault,
+        Float: FloatStateForOutputDefault,
+        String: StringStateForOutputDefault,
+        Array: ArrayStateForOutputDefault,
+        Tuple: TupleStateForOutputDefault,
+        Object: ObjectStateForOutputDefault,
     }
 
     return TO_STATECLS[type(node)]
