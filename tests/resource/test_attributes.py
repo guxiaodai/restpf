@@ -1,27 +1,24 @@
 import pytest
 
 from restpf.resource.attributes import (
+    Bool,
+    Integer,
+    Float,
+    String,
+    Array,
+    Tuple,
+    Object,
+)
+
+from restpf.resource.attribute_states import (
     create_attribute_state_tree,
 
-    Bool,
     BoolStateForOutputDefault,
-
-    Integer,
     IntegerStateForOutputDefault,
-
-    Float,
     FloatStateForOutputDefault,
-
-    String,
     StringStateForOutputDefault,
-
-    Array,
     ArrayStateForOutputDefault,
-
-    Tuple,
     TupleStateForOutputDefault,
-
-    Object,
     ObjectStateForOutputDefault,
 )
 
