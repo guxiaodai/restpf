@@ -89,6 +89,9 @@ class LeafAttributeInputState(LeafAttributeState):
         else:
             self.bh_value = value
 
+    def serialize(self):
+        return None
+
 
 class NestedAttributeState(BehaviorTreeNodeStateNested):
 
@@ -223,6 +226,18 @@ class ArrayStateConfig:
 
 class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
 
+    def __getitem__(self, key):
+        if isinstance(key, (int, slice)):
+            return self.bh_child(key)
+        else:
+            raise RuntimeError('wrong type')
+
+    def __len__(self):
+        return self.bh_children_size
+
+    def __iter__(self):
+        return iter(self.bh_children)
+
     def element_attr(self):
         return self.bh_relative_node(
             self.bh_nodecls.ELEMENT_ATTR_NAME,
@@ -245,29 +260,7 @@ class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
         else:
             return not isinstance(self.bh_child(), NestedAttributeState)
 
-    def validate(self):
-        element_attrcls = self.element_attrcls()
-        for element_state in self.element_attr_states:
-            if element_state.bh_nodecls is not element_attrcls:
-                return False
-            if not element_state.validate():
-                return False
-
-        return True
-
-    def __getitem__(self, key):
-        if isinstance(key, (int, slice)):
-            return self.bh_child(key)
-        else:
-            raise RuntimeError('wrong type')
-
-    def __len__(self):
-        return self.bh_children_size
-
-    def __iter__(self):
-        return iter(self.bh_children)
-
-    def _init_state_for_list(self, values, node2statecls):
+    def init_state_for_list(self, values, node2statecls):
         assert isinstance(values, abc.Iterable)
 
         element_attr = self.element_attr()
@@ -281,11 +274,21 @@ class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
+    def validate(self):
+        element_attrcls = self.element_attrcls()
+        for element_state in self.element_attr_states:
+            if element_state.bh_nodecls is not element_attrcls:
+                return False
+            if not element_state.validate():
+                return False
+
+        return True
+
 
 class ArrayStateForOutputDefault(ArrayStateCommon):
 
     def init_state(self, values, node2statecls):
-        self._init_state_for_list(values, node2statecls)
+        self.init_state_for_list(values, node2statecls)
 
     def serialize(self):
         output_list = []
@@ -316,9 +319,12 @@ class ArrayStateForInputDefault(ArrayStateCommon):
     def init_state(self, values, node2statecls):
         if isinstance(values, abc.Mapping):
             assert values['type'] == self.ATTR_TYPE
-            self._init_state_for_list(values['value'], node2statecls)
+            self.init_state_for_list(values['value'], node2statecls)
         else:
-            self._init_state_for_list(values, node2statecls)
+            self.init_state_for_list(values, node2statecls)
+
+    def serialize(self):
+        return None
 
 
 class TupleStateConfig:
@@ -343,7 +349,7 @@ class TupleStateCommon(TupleStateConfig):
     def element_attr_name(self, idx):
         return self.bh_node.element_attr_name(idx)
 
-    def _init_state_for_list(self, values, node2statecls):
+    def init_state_for_list(self, values, node2statecls):
         assert isinstance(values, abc.Iterable)
 
         if len(values) != self.element_attr_size:
@@ -357,12 +363,6 @@ class TupleStateCommon(TupleStateConfig):
                 node2statecls,
             )
             self.bh_add_child(element_state)
-
-
-class TupleStateForOutputDefault(TupleStateCommon, ArrayStateForOutputDefault):
-
-    def init_state(self, values, node2statecls):
-        self._init_state_for_list(values, node2statecls)
 
     def validate(self):
 
@@ -381,13 +381,21 @@ class TupleStateForOutputDefault(TupleStateCommon, ArrayStateForOutputDefault):
         return True
 
 
+class TupleStateForOutputDefault(TupleStateCommon, ArrayStateForOutputDefault):
+
+    def init_state(self, values, node2statecls):
+        self.init_state_for_list(values, node2statecls)
+
+
 class TupleStateForInputDefault(TupleStateCommon, ArrayStateForInputDefault):
 
     '''
-    Don't need to override anything, since _init_state_for_list has already
+    Don't need to override anything, since init_state_for_list has already
     been override in TupleStateCommon.
     '''
-    pass
+
+    def serialize(self):
+        return None
 
 
 class ObjectStateConfig:
@@ -454,4 +462,6 @@ class ObjectStateForInputDefault(ObjectStateCommon):
     Both ObjectStateForInputDefault and ObjectStateForOutputDefault should use
     the same way to construct the state.
     '''
-    pass
+
+    def serialize(self):
+        return None
