@@ -129,6 +129,10 @@ class AttributeCollection:
         self._attr_obj = Object(*named_element_attrs)
         self._callback_info = CallbackInformation(self._attr_obj)
 
+    @property
+    def attr_obj(self):
+        return self._attr_obj
+
     def create_callback_registrar(self):
         return CallbackRegistrar(self._callback_info, self._attr_obj)
 

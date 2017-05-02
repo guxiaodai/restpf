@@ -1,18 +1,76 @@
-from restpf.attributes import create_ist_from_bh_object
+import inspect
+# from restpf.attributes import create_ist_from_bh_object
+
+
+def call_function_with_kwargs(func, kwargs):
+    sig_parameters = inspect.signature(func).parameters
+    params_all = set(sig_parameters)
+
+    params_without_default = set(filter(
+        lambda k: sig_parameters[k].default is inspect.Parameter.empty,
+        params_all,
+    ))
+
+    kwargs_keys = set(kwargs)
+
+    if not params_without_default <= kwargs_keys:
+        raise RuntimeError('Missing keys')
+
+    intersection = params_all & kwargs_keys
+    kwargs_subset = {key: kwargs[key] for key in intersection}
+    return func(**kwargs_subset)
 
 
 class ContextRule:
-    pass
+
+    def pre_validate_ist(self, intermediate_state_tree):
+        '''
+        return boolean for step (2).
+        '''
+        raise NotImplemented
+
+    def select_callbacks(self, attr_collection):
+        '''
+        return ordered [(node, callback), ...] for step (3).
+        '''
+        raise NotImplemented
+
+    def callback_kwargs(self, node, callback):
+        '''
+        return a dict.
+        TODO: define available keys.
+        '''
+        raise NotImplemented
+
+    def post_validate_ist(self, intermediate_state_tree):
+        '''
+        return boolean for step (6).
+        '''
+        raise NotImplemented
 
 
 class IntermediateStateTreeBuilder:
 
-    def build_ist(self, state_tree):
-        pass
+    def build_ist(self, attr_collection):
+        '''
+        return an IST for step (1).
+        '''
+        raise NotImplemented
 
 
 class IntermediateStateTreeCollector:
-    pass
+
+    def collect_pre_ist(self, intermediate_state_tree):
+        '''
+        collect pre-generated IST for step (7).
+        '''
+        raise NotImplemented
+
+    def collect_post_ist(self, intermediate_state_tree):
+        '''
+        collect post-generated IST for step (7).
+        '''
+        raise NotImplemented
 
 
 class Pipeline:
@@ -25,15 +83,15 @@ class Pipeline:
 
     Pipeline defines:
 
-    1. initialize empty IST based on attr_collection.
-    2. setup IST using input_state_setter.
-    3. pre-validate IST using context_rule.
-    4. conditional select and order callbacks to invoke,
+    1. setup IST using input_state_setter.
+    2. pre-validate IST using context_rule.
+    3. conditional select and order callbacks to invoke,
     based on the rule provided by context_rule.
-    5. invoke callbacks selected by step (4).
-    6. generate a new IST to capture the return value of callbacks.
-    7. post-validate the new IST using context_rule.
-    8. pass both ISTs from step (2) and step (6) to output_state_collector.
+    4. invoke callbacks selected by step (3), with kwargs return by
+    callback_kwargs.
+    5. generate a new IST to capture the return value of callbacks.
+    6. post-validate the new IST using context_rule.
+    7. pass both ISTs from step (1) and step (5) to output_state_collector.
 
     Case of GET/OPTIONS:
 
@@ -58,6 +116,3 @@ class Pipeline:
                  output_state_collector):
 
         self._attr_collection = attr_collection
-        self._intermediate_state_tree = create_ist_from_bh_object(
-            attr_collection._attr_obj,
-        )
