@@ -3,5 +3,6 @@ pytest-flake8
 pytest-cov
 pytest-mock
 pytest-travis-fold
+pytest-asyncio
 coveralls
 wheel

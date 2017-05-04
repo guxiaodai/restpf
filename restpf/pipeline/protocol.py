@@ -1,48 +1,28 @@
-import inspect
 # from restpf.attributes import create_ist_from_bh_object
-
-
-def call_function_with_kwargs(func, kwargs):
-    sig_parameters = inspect.signature(func).parameters
-    params_all = set(sig_parameters)
-
-    params_without_default = set(filter(
-        lambda k: sig_parameters[k].default is inspect.Parameter.empty,
-        params_all,
-    ))
-
-    kwargs_keys = set(kwargs)
-
-    if not params_without_default <= kwargs_keys:
-        raise RuntimeError('Missing keys')
-
-    intersection = params_all & kwargs_keys
-    kwargs_subset = {key: kwargs[key] for key in intersection}
-    return func(**kwargs_subset)
 
 
 class ContextRule:
 
-    def pre_validate_ist(self, intermediate_state_tree):
+    async def pre_validate_ist(self, intermediate_state_tree):
         '''
         return boolean for step (2).
         '''
         raise NotImplemented
 
-    def select_callbacks(self, attr_collection):
+    async def select_callbacks(self, attr_collection):
         '''
         return ordered [(node, callback), ...] for step (3).
         '''
         raise NotImplemented
 
-    def callback_kwargs(self, node, callback):
+    async def callback_kwargs(self, node, callback):
         '''
         return a dict.
         TODO: define available keys.
         '''
         raise NotImplemented
 
-    def post_validate_ist(self, intermediate_state_tree):
+    async def post_validate_ist(self, intermediate_state_tree):
         '''
         return boolean for step (6).
         '''
@@ -51,7 +31,7 @@ class ContextRule:
 
 class IntermediateStateTreeBuilder:
 
-    def build_ist(self, attr_collection):
+    async def build_ist(self, attr_collection):
         '''
         return an IST for step (1).
         '''
@@ -60,13 +40,13 @@ class IntermediateStateTreeBuilder:
 
 class IntermediateStateTreeCollector:
 
-    def collect_pre_ist(self, intermediate_state_tree):
+    async def collect_pre_ist(self, intermediate_state_tree):
         '''
         collect pre-generated IST for step (7).
         '''
         raise NotImplemented
 
-    def collect_post_ist(self, intermediate_state_tree):
+    async def collect_post_ist(self, intermediate_state_tree):
         '''
         collect post-generated IST for step (7).
         '''
@@ -116,3 +96,12 @@ class Pipeline:
                  output_state_collector):
 
         self._attr_collection = attr_collection
+        self._context_rule = context_rule
+        self._input_state_setter = input_state_setter
+        self._output_state_collector = output_state_collector
+
+        self._stage_one_ist = {}
+        self._stage_two_ist = {}
+
+    async def run(self):
+        pass
