@@ -19,8 +19,19 @@ foo.noraml_user
 foo.username
 """
 
-from restpf.utils.constants import ALL_HTTP_METHODS
-from .attributes import Object, create_ist_from_bh_object
+import inspect
+
+from restpf.utils.constants import (
+    ALL_HTTP_METHODS,
+)
+from .attributes import (
+    Attribute,
+    Object,
+    Integer,
+    String,
+    create_ist_from_bh_object,
+    AppearanceConfig,
+)
 
 
 class CallbackRegistrar:
@@ -127,11 +138,21 @@ class AttributeCollection:
 
     def __init__(self, *named_element_attrs):
         self._attr_obj = Object(*named_element_attrs)
+        if not self._check_attr_obj(self._attr_obj):
+            raise RuntimeError('TODO: AttributeCollection.__init__')
+
         self._callback_info = CallbackInformation(self._attr_obj)
+
+    def _check_attr_obj(self, attr_obj):
+        return True
 
     @property
     def attr_obj(self):
         return self._attr_obj
+
+    @property
+    def collection_name(self):
+        return self.COLLECTION_NAME
 
     def create_callback_registrar(self):
         return CallbackRegistrar(self._callback_info, self._attr_obj)
@@ -162,6 +183,17 @@ class Attributes(AttributeCollection):
 
     COLLECTION_NAME = 'attributes'
 
+    def _check_attr_obj(self, attr_obj):
+        if not isinstance(attr_obj, Object):
+            # stop condition.
+            return isinstance(attr_obj, Attribute)
+        else:
+            # loop over every pair.
+            for node in attr_obj.bh_children:
+                if not self._check_attr_obj(node):
+                    return False
+            return True
+
 
 class Relationships(AttributeCollection):
 
@@ -183,21 +215,39 @@ class Relationships(AttributeCollection):
 
     COLLECTION_NAME = 'relationships'
 
-
-class ResourceDefinition:
-
-    """
-    ResourceDefinition do not make any assumption on the attribute structure.
-    It accepts any number of Attribute and AttributeCollection. User of this
-    class should explicity mark the attribute like `type`, `id`.
-    """
-
-    def __init__(self, resource_type, *option_containers):
-        self.resource_type = resource_type
+    def _check_attr_obj(self, attr_obj):
+        raise NotImplemented
 
 
-class Resource(ResourceDefinition):
+class Resource:
 
-    """
-    Special kinds of ResourceDefinition, with fixed attribute structure.
-    """
+    def __init__(self, name, attributes, relationships, id_attr=Integer):
+        self.name = name
+
+        self.id_node = self._generate_id_node(id_attr)
+
+        self.attributes = attributes
+        self.relationships = relationships
+
+    def _generate_id_node(self, id_attr):
+        if id_attr not in (Integer, String) and \
+                not isinstance(id_attr, (Integer, String)):
+            raise RuntimeError('_generate_id_node')
+
+        if inspect.isclass(id_attr):
+            return id_attr(
+                appear_in_get=AppearanceConfig.REQUIRE,
+                appear_in_post=AppearanceConfig.PROHIBITE,
+                appear_in_patch=AppearanceConfig.REQUIRE,
+                appear_in_put=AppearanceConfig.REQUIRE,
+            )
+        else:
+            return id_attr
+
+    def __getattribute__(self, name):
+        obj = super().__getattribute__(name)
+        if name in ('attributes', 'relationships'):
+            # for callback registrater.
+            return obj.create_callback_registrar()
+        else:
+            return obj

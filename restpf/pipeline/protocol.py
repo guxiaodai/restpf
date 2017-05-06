@@ -1,4 +1,5 @@
 # from restpf.attributes import create_ist_from_bh_object
+from restpf.utils.helper_functions import async_call
 
 
 class ContextRule:
@@ -9,7 +10,7 @@ class ContextRule:
         '''
         raise NotImplemented
 
-    async def select_callbacks(self, attr_collection):
+    async def select_callbacks(self, attr_collection, intermediate_state_tree):
         '''
         return ordered [(node, callback), ...] for step (3).
         '''
@@ -19,6 +20,12 @@ class ContextRule:
         '''
         return a dict.
         TODO: define available keys.
+        '''
+        raise NotImplemented
+
+    async def build_ist(self, attr_collection, intermediate_state_tree):
+        '''
+        return an IST for step (4).
         '''
         raise NotImplemented
 
@@ -63,14 +70,21 @@ class Pipeline:
 
     Pipeline defines:
 
-    1. setup IST using input_state_setter.
-    2. pre-validate IST using context_rule.
-    3. conditional select and order callbacks to invoke,
+    1. Setup IST using input_state_setter.
+
+    2. Pre-validate IST using context_rule.
+
+    3. Conditional select and order callbacks to invoke,
     based on the rule provided by context_rule.
-    4. invoke callbacks selected by step (3), with kwargs return by
-    callback_kwargs.
-    5. generate a new IST to capture the return value of callbacks.
-    6. post-validate the new IST using context_rule.
+
+    4. Invoke callbacks selected by step (3), with kwargs return by
+    callback_kwargs. context_rule.build_ist will be used to construct the IST
+    based on return values of callbacks.
+
+    5. Generate a new IST to capture the return value of callbacks.
+
+    6. Post-validate the new IST using context_rule.
+
     7. pass both ISTs from step (1) and step (5) to output_state_collector.
 
     Case of GET/OPTIONS:
@@ -95,13 +109,36 @@ class Pipeline:
                  input_state_setter,
                  output_state_collector):
 
-        self._attr_collection = attr_collection
-        self._context_rule = context_rule
-        self._input_state_setter = input_state_setter
-        self._output_state_collector = output_state_collector
+        self.attr_collection = attr_collection
+        self.context_rule = context_rule
+        self.input_state_setter = input_state_setter
+        self.output_state_collector = output_state_collector
 
-        self._stage_one_ist = {}
-        self._stage_two_ist = {}
+        self.input_generated_ist = {}
+        self.input_generated_ist_is_valid = False
+
+        self.callback_genreated_ist = {}
+        self.callback_genreated_ist_is_valid = False
+
+        self.output_generated_ist = {}
+        self.output_generated_ist_is_valid = False
+
+        self.selected_node_callback_pairs = []
 
     async def run(self):
-        pass
+        self.callback_genreated_ist = await async_call(
+            self.input_state_setter.build_ist,
+            self.attr_collection,
+        )
+
+        self.input_generated_ist_is_valid = await async_call(
+            self.context_rule.pre_validate_ist,
+            self.input_generated_ist,
+        )
+        if not self.input_generated_ist_is_valid:
+            raise RuntimeError('TODO: error processor')
+
+        self.selected_node_callback_pairs = await async_call(
+            self.context_rule.select_callbacks,
+            self.attr_collection, self.input_generated_ist,
+        )

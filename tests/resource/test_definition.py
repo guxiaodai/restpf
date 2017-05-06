@@ -4,6 +4,8 @@ from restpf.resource.attributes import (
 )
 from restpf.resource.definition import (
     AttributeCollection,
+    Attributes,
+    Resource,
 )
 
 
@@ -70,3 +72,19 @@ def test_registration_by_dict():
         }),
     })
     assert ac
+
+
+def test_resource_definition():
+    rd = Resource(
+        'test',
+        Attributes({
+            'foo': String,
+            'a': Object({
+                'b': Object({
+                    'bar': String,
+                }),
+            }),
+        }),
+        None,
+    )
+    assert rd.attributes.a.b.bar

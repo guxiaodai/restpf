@@ -1,3 +1,6 @@
+from enum import Enum, auto
+
+
 HTTP_METHOD_POST = 'POST'
 HTTP_METHOD_GET = 'GET'
 HTTP_METHOD_PATCH = 'PATCH'
@@ -21,3 +24,10 @@ PATCH = HTTP_METHOD_PATCH
 DELETE = HTTP_METHOD_DELETE
 PUT = HTTP_METHOD_PUT
 OPTIONS = HTTP_METHOD_OPTIONS
+
+
+class AppearanceConfig(Enum):
+
+    REQUIRE = auto()
+    PROHIBITE = auto()
+    FREE = auto()

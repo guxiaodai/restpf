@@ -8,6 +8,7 @@ from restpf.resource.attributes import (
     Array,
     Tuple,
     Object,
+    AppearanceConfig,
 )
 
 from restpf.resource.attribute_states import (
@@ -29,8 +30,6 @@ from restpf.resource.attribute_states import (
     TupleStateForInputDefault,
     ObjectStateForInputDefault,
 )
-
-from restpf.utils.constants import GET, POST
 
 
 def node2statecls_output(node):
@@ -294,11 +293,13 @@ def test_object_mapping_constructor():
     })
 
 
-def test_nullable():
-    String(nullable=[POST, GET])
-    String(nullable=None)
+def test_appearance_options():
+    s = String(appear_in_get=AppearanceConfig.REQUIRE)
+    assert s.appear_in_get is AppearanceConfig.REQUIRE
+    assert s.appear_in_patch is AppearanceConfig.FREE
+
     with pytest.raises(AssertionError):
-        String(nullable=['wrong'])
+        String(appear_in_get='whatever')
 
 
 def test_value_property():

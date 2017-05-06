@@ -25,20 +25,23 @@ Nested Types:
 Common configuration for attributes:
 
 - name: [string] Name of the attribute.
-- nullable: [a list of http methods].
-    - GET: corresponding value in IST is allowed to be null.
-    - POST: it's ok to not post this attribute for resource creation.
-    - PUT: same as POST.
-    - PATCH: similar to POST. notice, attributes are nullable in PATCH by
-    default, except for some special attributes like id and type.
-    - OPTIONS: might have something to do with definition exporting. (TODO)
-    - DELETE: not support.
+
+Appearance: one of there state: REQUIRE, PROHIBITE, FREE
+
+- appear_in_get: For GET, FREE by default.
+- appear_in_post: For POST, REQUIRE by default.
+- appear_in_put: For Put, REQUIRE by default.
+- appear_in_patch: For PATCH, FREE by default.
+
+special attributes:
+
+- id: PROHIBITE in POST, REQUIRE in GET.
 """
 
 import collections.abc as abc
 import inspect
 
-from restpf.utils.constants import ALL_HTTP_METHODS
+from restpf.utils.constants import ALL_HTTP_METHODS, AppearanceConfig
 from restpf.utils.helper_functions import to_iterable
 from .behavior_tree import BehaviorTreeNode
 
@@ -98,12 +101,23 @@ def transfrom_mapping_to_attribute_states(name2attr):
 
 class Attribute(BehaviorTreeNode):
 
-    def __init__(self, nullable=[]):
+    def __init__(self, **options):
         super().__init__()
 
         # shared settings.
         self.rename('undefined')
-        self._init_nullable(nullable)
+        self._init_appearance_options(**options)
+
+    def _init_appearance_options(self, **options):
+
+        def helper(name, default):
+            setattr(self, name, options.get(name, default))
+            assert getattr(self, name) in AppearanceConfig
+
+        helper('appear_in_get', AppearanceConfig.FREE)
+        helper('appear_in_patch', AppearanceConfig.FREE)
+        helper('appear_in_post', AppearanceConfig.REQUIRE)
+        helper('appear_in_put', AppearanceConfig.REQUIRE)
 
     def _init_nullable(self, nullable):
         self.nullable = set()
