@@ -1,29 +1,20 @@
 from enum import Enum, auto
 
 
-HTTP_METHOD_POST = 'POST'
-HTTP_METHOD_GET = 'GET'
-HTTP_METHOD_PATCH = 'PATCH'
-HTTP_METHOD_DELETE = 'DELETE'
-HTTP_METHOD_PUT = 'PUT'
-HTTP_METHOD_OPTIONS = 'OPTIONS'
+class EnumByName(Enum):
 
-ALL_HTTP_METHODS = [
-    HTTP_METHOD_POST,
-    HTTP_METHOD_GET,
-    HTTP_METHOD_PATCH,
-    HTTP_METHOD_DELETE,
-    HTTP_METHOD_PUT,
-    HTTP_METHOD_OPTIONS,
-]
+    def _generate_next_value_(name, *args, **kwargs):
+        return name
 
-# abbr.
-POST = HTTP_METHOD_POST
-GET = HTTP_METHOD_GET
-PATCH = HTTP_METHOD_PATCH
-DELETE = HTTP_METHOD_DELETE
-PUT = HTTP_METHOD_PUT
-OPTIONS = HTTP_METHOD_OPTIONS
+
+class HTTPMethodConfig(EnumByName):
+
+    POST = auto()
+    GET = auto()
+    PATCH = auto()
+    DELETE = auto()
+    PUT = auto()
+    OPTIONS = auto()
 
 
 class AppearanceConfig(Enum):

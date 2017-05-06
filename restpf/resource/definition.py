@@ -20,9 +20,10 @@ foo.username
 """
 
 import inspect
+import operator
 
 from restpf.utils.constants import (
-    ALL_HTTP_METHODS,
+    HTTPMethodConfig,
 )
 from .attributes import (
     Attribute,
@@ -36,7 +37,10 @@ from .attributes import (
 
 class CallbackRegistrar:
 
-    _AVAILABLE_CONTEXT = set(ALL_HTTP_METHODS)
+    _AVAILABLE_CONTEXT = set(map(
+        operator.attrgetter('value'),
+        HTTPMethodConfig,
+    ))
 
     def __init__(self, callback_info, attr_obj):
         self._callback_info = callback_info

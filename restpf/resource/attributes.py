@@ -41,7 +41,7 @@ special attributes:
 import collections.abc as abc
 import inspect
 
-from restpf.utils.constants import ALL_HTTP_METHODS, AppearanceConfig
+from restpf.utils.constants import AppearanceConfig
 from restpf.utils.helper_functions import to_iterable
 from .behavior_tree import BehaviorTreeNode
 
@@ -118,19 +118,6 @@ class Attribute(BehaviorTreeNode):
         helper('appear_in_patch', AppearanceConfig.FREE)
         helper('appear_in_post', AppearanceConfig.REQUIRE)
         helper('appear_in_put', AppearanceConfig.REQUIRE)
-
-    def _init_nullable(self, nullable):
-        self.nullable = set()
-
-        if not nullable:
-            # passing None is ok.
-            return
-        # should be iterable.
-        assert isinstance(nullable, abc.Iterable)
-
-        for http_method in nullable:
-            assert http_method in ALL_HTTP_METHODS
-            self.nullable.add(http_method)
 
     def rename(self, name):
         self.bh_rename(name)
