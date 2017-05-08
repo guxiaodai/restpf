@@ -53,7 +53,7 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
     def init_state(self, value, node2statecls):
         raise NotImplemented
 
-    def validate(self):
+    def validate(self, attr_context=None):
         return isinstance(self.bh_value, self.PYTHON_TYPE)
 
     def serialize(self):
@@ -274,7 +274,7 @@ class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
+    def validate(self, attr_context=None):
         element_attrcls = self.element_attrcls()
         for element_state in self.element_attr_states:
             if element_state.bh_nodecls is not element_attrcls:
@@ -364,7 +364,7 @@ class TupleStateCommon(TupleStateConfig):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
+    def validate(self, attr_context=None):
 
         if len(self.element_attrs) != len(self.element_attr_states):
             return False
@@ -422,7 +422,7 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
+    def validate(self, attr_context=None):
         if (set(self.element_named_attr_states) !=
                 set(self.element_named_attrs)):
             return False

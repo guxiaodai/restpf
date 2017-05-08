@@ -10,7 +10,7 @@ class ContextRule:
         '''
         raise NotImplemented
 
-    async def select_callbacks(self, attr_collection, intermediate_state_tree):
+    async def select_callbacks(self, resource, intermediate_state_tree):
         '''
         return ordered [(node, callback), ...] for step (3).
         '''
@@ -23,7 +23,7 @@ class ContextRule:
         '''
         raise NotImplemented
 
-    async def build_ist(self, attr_collection, intermediate_state_tree):
+    async def build_ist(self, resource, intermediate_state_tree):
         '''
         return an IST for step (4).
         '''
@@ -38,7 +38,7 @@ class ContextRule:
 
 class IntermediateStateTreeBuilder:
 
-    async def build_ist(self, attr_collection):
+    async def build_ist(self, resource):
         '''
         return an IST for step (1).
         '''
@@ -63,10 +63,10 @@ class IntermediateStateTreeCollector:
 class Pipeline:
 
     '''
-    attr_collection: instance of AttributeCollection
+    resource: instance of AttributeCollection
 
     Core: intermediate state tree (IST).
-    IST is identical to the nested structure of attr_collection.
+    IST is identical to the nested structure of resource.
 
     Pipeline defines:
 
@@ -104,12 +104,12 @@ class Pipeline:
     '''
 
     def __init__(self,
-                 attr_collection,
+                 resource,
                  context_rule,
                  input_state_setter,
                  output_state_collector):
 
-        self.attr_collection = attr_collection
+        self.resource = resource
         self.context_rule = context_rule
         self.input_state_setter = input_state_setter
         self.output_state_collector = output_state_collector
@@ -128,7 +128,7 @@ class Pipeline:
     async def run(self):
         self.callback_genreated_ist = await async_call(
             self.input_state_setter.build_ist,
-            self.attr_collection,
+            self.resource,
         )
 
         self.input_generated_ist_is_valid = await async_call(
@@ -140,5 +140,5 @@ class Pipeline:
 
         self.selected_node_callback_pairs = await async_call(
             self.context_rule.select_callbacks,
-            self.attr_collection, self.input_generated_ist,
+            self.resource, self.input_generated_ist,
         )

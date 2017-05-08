@@ -41,8 +41,9 @@ special attributes:
 import collections.abc as abc
 import inspect
 
-from restpf.utils.constants import AppearanceConfig
+from restpf.utils.constants import HTTPMethodConfig, AppearanceConfig
 from restpf.utils.helper_functions import to_iterable
+from restpf.utils.helper_classes import ContextOperator
 from .behavior_tree import BehaviorTreeNode
 
 
@@ -125,6 +126,18 @@ class Attribute(BehaviorTreeNode):
     @property
     def name(self):
         return self.bh_name
+
+
+class AttributeContextOperator(ContextOperator):
+
+    OPERATION_MAPPING = {
+        'appear': {
+            HTTPMethodConfig.GET: 'appear_in_get',
+            HTTPMethodConfig.PATCH: 'appear_in_patch',
+            HTTPMethodConfig.POST: 'appear_in_post',
+            HTTPMethodConfig.PUT: 'appear_in_put',
+        }
+    }
 
 
 class LeafAttribute(Attribute):
