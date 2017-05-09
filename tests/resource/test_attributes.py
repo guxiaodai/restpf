@@ -9,6 +9,7 @@ from restpf.resource.attributes import (
     Tuple,
     Object,
     AppearanceConfig,
+    AttributeContextOperator,
 )
 
 from restpf.resource.attribute_states import (
@@ -29,6 +30,9 @@ from restpf.resource.attribute_states import (
     ArrayStateForInputDefault,
     TupleStateForInputDefault,
     ObjectStateForInputDefault,
+)
+from restpf.utils.constants import (
+    HTTPMethodConfig,
 )
 
 
@@ -60,9 +64,26 @@ def node2statecls_input(node):
     return TO_STATECLS[type(node)]
 
 
+class _TestContext:
+
+    cxt = HTTPMethodConfig.GET
+
+    @classmethod
+    def set_context(cls, value):
+        cls.cxt = value
+
+    @classmethod
+    def gen_attr_context(cls):
+        return AttributeContextOperator(cls.cxt)
+
+
 def _gen_test_result(attr, value, node2statecls):
     state = create_attribute_state_tree(attr, value, node2statecls)
-    return state, state.validate(), state.serialize()
+    return (
+        state,
+        state.validate(_TestContext.gen_attr_context()),
+        state.serialize(),
+    )
 
 
 def gen_test_result_for_output(attr, value):
@@ -228,6 +249,8 @@ def test_tuple_abbr_serialization():
 
 
 def test_object_output():
+    _TestContext.set_context(HTTPMethodConfig.POST)
+
     attr = Object(
         ('foo', Integer()),
         ('bar', String()),
@@ -257,6 +280,12 @@ def test_object_output():
             'bar': {'type': 'string', 'value': 'test'},
         },
     )
+
+    _TestContext.set_context(HTTPMethodConfig.GET)
+
+    assert_validate_output(attr, {
+        'bar': 'test',
+    })
 
 
 def test_object_input():
@@ -300,6 +329,14 @@ def test_appearance_options():
 
     with pytest.raises(AssertionError):
         String(appear_in_get='whatever')
+
+    attr = Integer()
+
+    _TestContext.set_context(HTTPMethodConfig.POST)
+    assert_not_validate_output(attr, None)
+
+    _TestContext.set_context(HTTPMethodConfig.GET)
+    assert_validate_output(attr, None)
 
 
 def test_value_property():

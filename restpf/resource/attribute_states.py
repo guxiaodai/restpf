@@ -1,4 +1,5 @@
 import collections.abc as abc
+from functools import wraps
 
 from .attributes import (
     Bool,
@@ -10,6 +11,7 @@ from .attributes import (
     Array,
     Tuple,
     Object,
+    AppearanceConfig,
 )
 from .behavior_tree import (
     BehaviorTreeNodeStateLeaf,
@@ -44,6 +46,40 @@ def create_attribute_state_tree(node, value, node2statecls):
     return state
 
 
+def _check_on_none_value_case(state, attr_context):
+
+    if isinstance(state, LeafAttributeState):
+        is_null = state.bh_value is None
+    elif isinstance(state, NestedAttributeState):
+        is_null = state.bh_children_size == 0
+    else:
+        raise NotImplemented
+
+    if is_null:
+        return (
+            True,
+            attr_context.appear(state.bh_node) is not AppearanceConfig.REQUIRE
+        )
+    else:
+        return (
+            False,
+            None,
+        )
+
+
+def nullable_processor(validator):
+
+    @wraps(validator)
+    def validator_with_nullable_processing(self, attr_context):
+        can_return, flag = _check_on_none_value_case(self, attr_context)
+        if can_return:
+            return flag
+        else:
+            return validator(self, attr_context)
+
+    return validator_with_nullable_processing
+
+
 class LeafAttributeState(BehaviorTreeNodeStateLeaf):
 
     # require subclass to override.
@@ -53,7 +89,8 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
     def init_state(self, value, node2statecls):
         raise NotImplemented
 
-    def validate(self, attr_context=None):
+    @nullable_processor
+    def validate(self, attr_context):
         return isinstance(self.bh_value, self.PYTHON_TYPE)
 
     def serialize(self):
@@ -274,12 +311,13 @@ class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self, attr_context=None):
+    @nullable_processor
+    def validate(self, attr_context):
         element_attrcls = self.element_attrcls()
         for element_state in self.element_attr_states:
             if element_state.bh_nodecls is not element_attrcls:
                 return False
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
@@ -364,7 +402,8 @@ class TupleStateCommon(TupleStateConfig):
             )
             self.bh_add_child(element_state)
 
-    def validate(self, attr_context=None):
+    @nullable_processor
+    def validate(self, attr_context):
 
         if len(self.element_attrs) != len(self.element_attr_states):
             return False
@@ -375,7 +414,7 @@ class TupleStateCommon(TupleStateConfig):
             )
             if element_state.bh_nodecls is not element_attr:
                 return False
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
@@ -422,10 +461,16 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self, attr_context=None):
-        if (set(self.element_named_attr_states) !=
-                set(self.element_named_attrs)):
-            return False
+    @nullable_processor
+    def validate(self, attr_context):
+        all_attr_names = set(self.element_named_attrs)
+        all_state_names = set(self.element_named_attr_states)
+
+        # for missing keys.
+        for name in (all_attr_names - all_state_names):
+            attr = self.element_named_attr(name)
+            if attr_context.appear(attr) is AppearanceConfig.REQUIRE:
+                return False
 
         for name, element_state in self.element_named_attr_states.items():
             element_attr = self.bh_relative_nodecls(name)
@@ -433,7 +478,7 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
             if element_state.bh_nodecls is not element_attr:
                 return False
 
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
