@@ -17,8 +17,14 @@ class HTTPMethodConfig(EnumByName):
     OPTIONS = auto()
 
 
-class AppearanceConfig(Enum):
+class AppearanceConfig(EnumByName):
 
     REQUIRE = auto()
     PROHIBITE = auto()
     FREE = auto()
+
+
+class UnknowAttributeConfig(EnumByName):
+
+    IGNORE = auto()
+    PROHIBITE = auto()

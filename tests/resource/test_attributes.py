@@ -261,6 +261,12 @@ def test_object_output():
         'bar': 'test',
     })
 
+    assert_validate_output(attr, {
+        'foo': 42,
+        'bar': 'test',
+        'unknown': 'whatever',
+    })
+
     assert_not_validate_output(attr, {
         'foo': '42',
         'bar': 'test',
@@ -285,6 +291,12 @@ def test_object_output():
 
     assert_validate_output(attr, {
         'bar': 'test',
+    })
+
+    assert_not_validate_output(attr, {
+        'foo': 42,
+        'bar': 'test',
+        'unknown': 'whatever',
     })
 
 

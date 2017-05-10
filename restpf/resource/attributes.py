@@ -41,7 +41,12 @@ special attributes:
 import collections.abc as abc
 import inspect
 
-from restpf.utils.constants import HTTPMethodConfig, AppearanceConfig
+from restpf.utils.constants import (
+    HTTPMethodConfig,
+    AppearanceConfig,
+    UnknowAttributeConfig,
+)
+
 from restpf.utils.helper_functions import to_iterable
 from restpf.utils.helper_classes import ContextOperator
 from .behavior_tree import BehaviorTreeNode
@@ -107,18 +112,36 @@ class Attribute(BehaviorTreeNode):
 
         # shared settings.
         self.rename('undefined')
-        self._init_appearance_options(**options)
 
-    def _init_appearance_options(self, **options):
+        # process options.
+        self._options = options
+        self._init_appearance_options()
+        self._init_object_unknow_name_options()
 
-        def helper(name, default):
-            setattr(self, name, options.get(name, default))
-            assert getattr(self, name) in AppearanceConfig
+    def _generate_options_setter(self, enumcls):
 
-        helper('appear_in_get', AppearanceConfig.FREE)
-        helper('appear_in_patch', AppearanceConfig.FREE)
-        helper('appear_in_post', AppearanceConfig.REQUIRE)
-        helper('appear_in_put', AppearanceConfig.REQUIRE)
+        def setter(name, default):
+            value = self._options.get(name, default)
+            assert value in enumcls
+            setattr(self, name, value)
+
+        return setter
+
+    def _init_appearance_options(self):
+        appear_setter = self._generate_options_setter(AppearanceConfig)
+
+        appear_setter('appear_in_get', AppearanceConfig.FREE)
+        appear_setter('appear_in_patch', AppearanceConfig.FREE)
+        appear_setter('appear_in_post', AppearanceConfig.REQUIRE)
+        appear_setter('appear_in_put', AppearanceConfig.REQUIRE)
+
+    def _init_object_unknow_name_options(self, *options):
+        unknow_setter = self._generate_options_setter(UnknowAttributeConfig)
+
+        unknow_setter('unknown_in_get', UnknowAttributeConfig.PROHIBITE)
+        unknow_setter('unknown_in_patch', UnknowAttributeConfig.IGNORE)
+        unknow_setter('unknown_in_post', UnknowAttributeConfig.IGNORE)
+        unknow_setter('unknown_in_put', UnknowAttributeConfig.IGNORE)
 
     def rename(self, name):
         self.bh_rename(name)
@@ -128,15 +151,20 @@ class Attribute(BehaviorTreeNode):
         return self.bh_name
 
 
+def _generate_http_method_context_operator(method_prefix):
+    return {
+        HTTPMethodConfig.GET: f'{method_prefix}_in_get',
+        HTTPMethodConfig.PATCH: f'{method_prefix}_in_patch',
+        HTTPMethodConfig.POST: f'{method_prefix}_in_post',
+        HTTPMethodConfig.PUT: f'{method_prefix}_in_put',
+    }
+
+
 class AttributeContextOperator(ContextOperator):
 
     OPERATION_MAPPING = {
-        'appear': {
-            HTTPMethodConfig.GET: 'appear_in_get',
-            HTTPMethodConfig.PATCH: 'appear_in_patch',
-            HTTPMethodConfig.POST: 'appear_in_post',
-            HTTPMethodConfig.PUT: 'appear_in_put',
-        }
+        'appear': _generate_http_method_context_operator('appear'),
+        'unknown': _generate_http_method_context_operator('unknown'),
     }
 
 

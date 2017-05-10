@@ -62,6 +62,9 @@ class BehaviorTreeNode:
     def bh_named_child(self, name):
         return self._bh_named_children.get(name)
 
+    def bh_remove_named_child(self, name):
+        self._bh_named_children.pop(name, None)
+
 
 class BehaviorTreeRoot(BehaviorTreeNode):
 
