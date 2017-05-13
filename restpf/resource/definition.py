@@ -51,8 +51,6 @@ class CallbackRegistrar:
         self.callback = None
 
     def register(self):
-        if not self.attr_path:
-            raise RuntimeError('empty path')
         if self.context is None:
             raise RuntimeError('context not set')
 
@@ -99,20 +97,33 @@ class CallbackInformation:
 
     _REGISTERED_CALLBACK_KEY_VALUE = 'value'
     _REGISTERED_CALLBACK_KEY_NEXT = 'next'
+    _REGISTERED_CALLBACK_TOP_LEVEL_NAME = 'RESTPF_TOP_LEVEL'
 
     def __init__(self, attr_obj):
-        # [attr path] => (callback, options)
-        self._registered_callback = create_ist_from_bh_object(
-            attr_obj,
-            lambda x: {
+        '''
+        (['next', [..., ]] 'value') => (callback, options)
+        '''
+
+        def _generate_value(x):
+            return {
                 self._REGISTERED_CALLBACK_KEY_VALUE: {},
                 self._REGISTERED_CALLBACK_KEY_NEXT: x,
-            },
+            }
+
+        self._registered_callback = create_ist_from_bh_object(
+            attr_obj, _generate_value,
         )
+        # patch for top-level attachement.
+        self._registered_callback[self._REGISTERED_CALLBACK_TOP_LEVEL_NAME] = \
+            _generate_value(None)
 
     def _locate_registered_callback_tree(self, path):
+        if not path:
+            path = [self._REGISTERED_CALLBACK_TOP_LEVEL_NAME]
+
         pre_obj = None
         cur_obj = self._registered_callback
+
         for name in path:
             pre_obj = cur_obj
             cur_obj = cur_obj[name][self._REGISTERED_CALLBACK_KEY_NEXT]
@@ -127,7 +138,7 @@ class CallbackInformation:
         assert isinstance(context, HTTPMethodConfig)
 
         obj = self._locate_registered_callback_tree(path)
-        return obj.get(context)
+        return obj.get(context, (None, None))
 
     def register_callback(self, callback_registrar):
         self._set_callback_and_options(

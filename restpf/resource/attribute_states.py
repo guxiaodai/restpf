@@ -520,8 +520,14 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
         return self.__getattr__(name)
 
     def __getattr__(self, name):
+        '''
+        1. Raise error on unregistered name.
+        2. return None for empty child state.
+        '''
+        # make sure name is registered.
+        assert self.element_named_attr(name)
+        # get child state.
         child = self.bh_named_child(name)
-        assert child
         return child
 
 

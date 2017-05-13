@@ -22,6 +22,12 @@ def test_registration():
 
     register = ac.create_callback_registrar()
 
+    @register.GET
+    def callback_top_level():
+        return 'top_level'
+
+    register = ac.create_callback_registrar()
+
     @register.foo.GET(whatever=42)
     def callback_foo_GET():
         return 'foo.GET'
@@ -45,6 +51,10 @@ def test_registration():
         return 'a.b.bar'
 
     accessor = ac.get_registered_callback_and_options
+
+    callback, options = accessor([], HTTPMethodConfig.GET)
+    assert None is options
+    assert 'top_level' == callback()
 
     callback, options = accessor(['foo'], HTTPMethodConfig.GET)
     assert {'whatever': 42} == options

@@ -400,3 +400,27 @@ def test_object_getattr():
     assert state.foo.value == 42
     assert state.bar.value == 'test'
     assert state.get('not an identifier').value == 42
+
+    with pytest.raises(AssertionError):
+        state.whatever
+
+
+def test_object_path():
+    attr = Object({
+        'a': Object({
+            'b': Object({
+                'c': Integer,
+            }),
+        }),
+    })
+
+    state = gen_test_state_for_output(attr, {
+        'a': {
+            'b': {
+                'c': 42,
+            },
+        },
+    })
+
+    assert list(state.a.b.c.bh_path) == ['a', 'b', 'c']
+    assert list(state.bh_path) == []

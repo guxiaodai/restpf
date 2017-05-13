@@ -34,3 +34,24 @@ class ContextOperator:
             return super().__getattribute__(name)
         else:
             return operator.attrgetter(op_proxy)
+
+
+class LinkedPath:
+
+    def __init__(self):
+        self.empty = True
+
+    def set_name_and_parent(self, name, parent):
+        self.empty = False
+        self.name = name
+        self.parent = parent
+
+    def __iter__(self):
+        node = self
+        path = []
+
+        while not node.empty:
+            path.append(node.name)
+            node = node.parent
+
+        return reversed(path)
