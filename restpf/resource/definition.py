@@ -20,7 +20,6 @@ foo.username
 """
 
 import inspect
-import operator
 
 from restpf.utils.constants import (
     HTTPMethodConfig,
@@ -37,8 +36,8 @@ from .attributes import (
 
 class CallbackRegistrar:
 
-    _AVAILABLE_CONTEXT = set(map(
-        operator.attrgetter('value'),
+    _AVAILABLE_CONTEXT = dict(map(
+        lambda method: (method.value, method),
         HTTPMethodConfig,
     ))
 
@@ -61,8 +60,9 @@ class CallbackRegistrar:
 
     def __getattr__(self, name):
         if self.context is None:
+            context = self._AVAILABLE_CONTEXT.get(name)
 
-            if name not in self._AVAILABLE_CONTEXT:
+            if context is None:
                 next_attr_obj = self._attr_obj.bh_named_child(name)
                 if next_attr_obj is None:
                     raise RuntimeError('Invalid attribute: ' + name)
@@ -70,7 +70,7 @@ class CallbackRegistrar:
                 self.attr_path.append(name)
                 self._attr_obj = next_attr_obj
             else:
-                self.context = name
+                self.context = context
 
             return self
         else:
@@ -124,6 +124,8 @@ class CallbackInformation:
         obj[context] = (callback, options)
 
     def get_registered_callback_and_options(self, path, context):
+        assert isinstance(context, HTTPMethodConfig)
+
         obj = self._locate_registered_callback_tree(path)
         return obj.get(context)
 

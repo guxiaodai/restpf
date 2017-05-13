@@ -1,6 +1,7 @@
 from restpf.resource.attributes import (
     String,
     Object,
+    HTTPMethodConfig,
 )
 from restpf.resource.definition import (
     AttributeCollection,
@@ -45,19 +46,19 @@ def test_registration():
 
     accessor = ac.get_registered_callback_and_options
 
-    callback, options = accessor(['foo'], 'GET')
+    callback, options = accessor(['foo'], HTTPMethodConfig.GET)
     assert {'whatever': 42} == options
     assert 'foo.GET' == callback()
 
-    callback, options = accessor(['foo'], 'POST')
+    callback, options = accessor(['foo'], HTTPMethodConfig.POST)
     assert None is options
     assert 'foo.POST' == callback()
 
-    callback, options = accessor(['a', 'b'], 'POST')
+    callback, options = accessor(['a', 'b'], HTTPMethodConfig.POST)
     assert None is options
     assert 'a.b' == callback()
 
-    callback, options = accessor(['a', 'b', 'bar'], 'PATCH')
+    callback, options = accessor(['a', 'b', 'bar'], HTTPMethodConfig.PATCH)
     assert None is options
     assert 'a.b.bar' == callback()
 
