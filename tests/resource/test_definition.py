@@ -99,3 +99,4 @@ def test_resource_definition():
         None,
     )
     assert rd.attributes.a.b.bar
+    assert isinstance(rd.attributes_obj, Attributes)

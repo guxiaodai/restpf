@@ -118,17 +118,20 @@ class CallbackInformation:
             _generate_value(None)
 
     def _locate_registered_callback_tree(self, path):
+        path = list(path)
         if not path:
             path = [self._REGISTERED_CALLBACK_TOP_LEVEL_NAME]
 
         pre_obj = None
         cur_obj = self._registered_callback
+        last_name = None
 
         for name in path:
             pre_obj = cur_obj
             cur_obj = cur_obj[name][self._REGISTERED_CALLBACK_KEY_NEXT]
+            last_name = name
 
-        return pre_obj[path[-1]][self._REGISTERED_CALLBACK_KEY_VALUE]
+        return pre_obj[last_name][self._REGISTERED_CALLBACK_KEY_VALUE]
 
     def _set_callback_and_options(self, path, context, callback, options):
         obj = self._locate_registered_callback_tree(path)
@@ -243,8 +246,8 @@ class Resource:
 
         self.id_node = self._generate_id_node(id_attr)
 
-        self.attributes = attributes
-        self.relationships = relationships
+        self._attributes = attributes
+        self._relationships = relationships
 
     def _generate_id_node(self, id_attr):
         if id_attr not in (Integer, String) and \
@@ -261,10 +264,18 @@ class Resource:
         else:
             return id_attr
 
+    @property
+    def attributes_obj(self):
+        return self._attributes
+
+    @property
+    def relationships_obj(self):
+        return self._relationships
+
     def __getattribute__(self, name):
-        obj = super().__getattribute__(name)
         if name in ('attributes', 'relationships'):
             # for callback registrater.
+            obj = super().__getattribute__(f'_{name}')
             return obj.create_callback_registrar()
         else:
-            return obj
+            return super().__getattribute__(name)
