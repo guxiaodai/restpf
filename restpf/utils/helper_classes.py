@@ -1,5 +1,6 @@
 import collections.abc as abc
 import operator
+import copy
 
 
 class ContextOperator:
@@ -55,3 +56,48 @@ class LinkedPath:
             node = node.parent
 
         return reversed(path)
+
+
+class TreeState:
+
+    _NEXT = '__next'
+    _VALUE = '__value'
+    _TOP_LEVEL = '__top_level'
+
+    def __init__(self, obj=None, in_gap=False):
+        self._obj = obj if obj else dict()
+        self._in_gap = in_gap
+
+    def touch(self, path=None, default=None):
+        path = list([] if path is None else path)
+        if not path:
+            path = [self._TOP_LEVEL]
+
+        obj = self._obj
+        last_gap = None
+
+        for name in path:
+            if name not in obj:
+                obj[name] = {
+                    self._VALUE: copy.copy(default),
+                    self._NEXT: {},
+                }
+            last_gap = obj[name]
+            obj = obj[name][self._NEXT]
+
+        return TreeState(obj=last_gap, in_gap=True)
+
+    @property
+    def next(self):
+        assert self._in_gap
+        return self._obj[self._NEXT]
+
+    def _value_get(self):
+        assert self._in_gap
+        return self._obj[self._VALUE]
+
+    def _value_set(self, value):
+        assert self._in_gap
+        self._obj[self._VALUE] = value
+
+    value = property(_value_get, _value_set)

@@ -24,12 +24,14 @@ import inspect
 from restpf.utils.constants import (
     HTTPMethodConfig,
 )
+from restpf.utils.helper_classes import (
+    TreeState,
+)
 from .attributes import (
     Attribute,
     Object,
     Integer,
     String,
-    create_ist_from_bh_object,
     AppearanceConfig,
 )
 
@@ -95,53 +97,26 @@ class CallbackRegistrar:
 
 class CallbackInformation:
 
-    _REGISTERED_CALLBACK_KEY_VALUE = 'value'
-    _REGISTERED_CALLBACK_KEY_NEXT = 'next'
-    _REGISTERED_CALLBACK_TOP_LEVEL_NAME = 'RESTPF_TOP_LEVEL'
-
     def __init__(self, attr_obj):
         '''
         (['next', [..., ]] 'value') => (callback, options)
         '''
-
-        def _generate_value(x):
-            return {
-                self._REGISTERED_CALLBACK_KEY_VALUE: {},
-                self._REGISTERED_CALLBACK_KEY_NEXT: x,
-            }
-
-        self._registered_callback = create_ist_from_bh_object(
-            attr_obj, _generate_value,
-        )
-        # patch for top-level attachement.
-        self._registered_callback[self._REGISTERED_CALLBACK_TOP_LEVEL_NAME] = \
-            _generate_value(None)
+        self._registered_callback = TreeState()
 
     def _locate_registered_callback_tree(self, path):
-        path = list(path)
-        if not path:
-            path = [self._REGISTERED_CALLBACK_TOP_LEVEL_NAME]
-
-        pre_obj = None
-        cur_obj = self._registered_callback
-        last_name = None
-
-        for name in path:
-            pre_obj = cur_obj
-            cur_obj = cur_obj[name][self._REGISTERED_CALLBACK_KEY_NEXT]
-            last_name = name
-
-        return pre_obj[last_name][self._REGISTERED_CALLBACK_KEY_VALUE]
+        return self._registered_callback.touch(path, default={})
 
     def _set_callback_and_options(self, path, context, callback, options):
+        assert isinstance(context, HTTPMethodConfig)
+
         obj = self._locate_registered_callback_tree(path)
-        obj[context] = (callback, options)
+        obj.value[context] = (callback, options)
 
     def get_registered_callback_and_options(self, path, context):
         assert isinstance(context, HTTPMethodConfig)
 
         obj = self._locate_registered_callback_tree(path)
-        return obj.get(context, (None, None))
+        return obj.value.get(context, (None, None))
 
     def register_callback(self, callback_registrar):
         self._set_callback_and_options(
