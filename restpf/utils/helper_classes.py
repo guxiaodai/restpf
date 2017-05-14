@@ -90,7 +90,38 @@ class TreeState:
     @property
     def next(self):
         assert self._in_gap
-        return self._obj[self._NEXT]
+
+        next_obj = self._obj[self._NEXT]
+        if next_obj:
+            return TreeState(obj=next_obj, in_gap=False)
+        else:
+            return None
+
+    @property
+    def root_gap(self):
+        assert not self._in_gap
+
+        gap_obj = self._obj.get(self._TOP_LEVEL)
+        if gap_obj:
+            return TreeState(
+                obj=gap_obj,
+                in_gap=True,
+            )
+        else:
+            return None
+
+    @property
+    def children(self):
+        assert not self._in_gap
+
+        ret = []
+        for key, value in self._obj.items():
+            if key == self._TOP_LEVEL:
+                continue
+            ret.append(
+                (key, TreeState(obj=value, in_gap=True)),
+            )
+        return ret
 
     def _value_get(self):
         assert self._in_gap

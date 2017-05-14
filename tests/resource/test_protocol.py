@@ -11,8 +11,12 @@ from restpf.resource.definition import (
 )
 from restpf.pipeline.protocol import (
     ContextRule,
+    _merge_output_of_callbacks,
 )
 from restpf.utils.helper_functions import async_call
+from restpf.utils.helper_classes import (
+    TreeState,
+)
 
 
 @pytest.mark.asyncio
@@ -56,3 +60,25 @@ async def test_resource_definition():
     )
 
     assert list(range(1, 5)) == list(map(lambda x: x[0](), ret))
+
+
+def test_merge_tree_state():
+    ts = TreeState()
+    ts.touch([]).value = {
+        'a': {
+            'b': 'should be override',
+            'c': 2,
+        },
+        'd': 'should be override',
+    }
+    ts.touch(['a', 'b']).value = 1
+    ts.touch(['d']).value = 3
+
+    expected = {
+        'a': {
+            'b': 1,
+            'c': 2,
+        },
+        'd': 3,
+    }
+    assert expected == _merge_output_of_callbacks(ts)
