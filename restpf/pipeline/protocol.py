@@ -1,9 +1,20 @@
-from collections import deque
+import asyncio
+from collections import (
+    deque,
+    namedtuple,
+)
 
 from restpf.utils.helper_classes import (
     TreeState,
 )
 from restpf.utils.helper_functions import async_call
+
+
+# `state`, `intput_state`, `output_state` should be instance of ResourceState.
+ResourceState = namedtuple(
+    'ResourceState',
+    ['attributes', 'relationships', 'resource_id'],
+)
 
 
 class ContextRule:
@@ -53,7 +64,7 @@ class ContextRule:
             self._select_callbacks(
                 resource.attributes_obj.get_registered_callback_and_options,
                 resource.attributes_obj.attr_obj,
-                state,
+                state.attributes,
             ),
         )
         # TODO: relationships
@@ -137,54 +148,67 @@ class PipelineBase:
         self.context_rule = context_rule
         self.state_builder = state_builder
 
-    async def run(self):
+    async def _build_input_state(self):
         await async_call(
             self.context_rule.load_data_from_state_builder,
             self.state_builder,
         )
 
-        intput_state = await async_call(
+        self.intput_state = await async_call(
             self.state_builder.build_input_state,
             self.resource,
         )
+
         intput_state_is_valid = await async_call(
             self.context_rule.validate_input_state,
-            intput_state,
+            self.intput_state,
         )
         if not intput_state_is_valid:
             raise RuntimeError('TODO: input state not valid')
 
+    async def _invoke_callbacks(self):
         callback_and_options = list(await async_call(
             self.context_rule.select_callbacks,
-            self.resource, intput_state,
+            self.resource, self.intput_state,
         ))
-        output_of_callbacks = TreeState()
 
+        async_gathers = []
+        async_paths = []
         for callback, attr, state in callback_and_options:
             kwargs = await async_call(
                 self.context_rule.callback_kwargs,
                 attr, state,
             )
-            ret = await async_call(
-                callback,
-                **kwargs,
+            async_gathers.append(
+                async_call(callback, **kwargs),
             )
-            output_of_callbacks.touch(attr.bh_path).value = ret
+            async_paths.append(
+                attr.bh_path,
+            )
 
-        merged_output_of_callbacks = _merge_output_of_callbacks(
+        output_of_callbacks = TreeState()
+        for path, ret in zip(async_paths,
+                             await asyncio.gather(*async_gathers)):
+            output_of_callbacks.touch(path).value = ret
+
+        self.merged_output_of_callbacks = _merge_output_of_callbacks(
             output_of_callbacks,
         )
 
-        output_state = self.state_builder.build_output_state(
-            self.resource, merged_output_of_callbacks,
+    async def _build_output_state(self):
+        self.output_state = self.state_builder.build_output_state(
+            self.resource, self.merged_output_of_callbacks,
         )
         output_state_is_valid = self.context_rule.validate_output_state(
-            output_state,
+            self.output_state,
         )
         if not output_state_is_valid:
             raise RuntimeError('TODO: output state not valid')
 
-        self.output_state = output_state
+    async def run(self):
+        await self._build_input_state()
+        await self._invoke_callbacks()
+        await self._build_output_state()
 
 
 class SingleResourcePipeline(PipelineBase):

@@ -211,7 +211,8 @@ class Relationships(AttributeCollection):
     COLLECTION_NAME = 'relationships'
 
     def _check_attr_obj(self, attr_obj):
-        raise NotImplemented
+        # TODO
+        return True
 
 
 class Resource:

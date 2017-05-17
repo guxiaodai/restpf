@@ -11,6 +11,7 @@ from restpf.resource.definition import (
 )
 from restpf.pipeline.protocol import (
     ContextRule,
+    ResourceState,
     _merge_output_of_callbacks,
 )
 from restpf.utils.helper_functions import async_call
@@ -56,7 +57,7 @@ async def test_resource_definition():
     ct = TestContext()
     ret = await async_call(
         ct.select_callbacks,
-        rd, None,
+        rd, ResourceState(None, None, None),
     )
 
     assert list(range(1, 5)) == list(map(lambda x: x[0](), ret))
