@@ -8,12 +8,22 @@ from restpf.utils.helper_classes import (
     TreeState,
 )
 from restpf.utils.helper_functions import async_call
+from restpf.resource.attributes import (
+    AttributeContextOperator,
+)
 
 
 # `state`, `intput_state`, `output_state` should be instance of ResourceState.
+_COLLECTION_NAMES = ['attributes', 'relationships', 'resource_id']
+
 ResourceState = namedtuple(
     'ResourceState',
-    ['attributes', 'relationships', 'resource_id'],
+    _COLLECTION_NAMES,
+)
+
+RawOutputStateContainer = namedtuple(
+    'RawOutputStateContainer',
+    _COLLECTION_NAMES,
 )
 
 
@@ -21,11 +31,19 @@ class ContextRule:
 
     HTTPMethod = None
 
+    def _default_validator(self, state):
+        context = AttributeContextOperator(self.HTTPMethod)
+        return all([
+            state.resource_id.validate(context),
+            state.attributes.validate(context),
+            # TODO: relationships.
+        ])
+
     async def validate_input_state(self, state):
-        return None
+        return self._default_validator(state)
 
     async def validate_output_state(self, state):
-        return None
+        return self._default_validator(state)
 
     def _select_callbacks(self, query, root_attr, root_state):
         queue = deque()
@@ -55,19 +73,32 @@ class ContextRule:
     # TODO: design bugfix. add mapping from attr collection to state.
     async def select_callbacks(self, resource, state):
         '''
-        return ordered [(callback, attr, state), ...].
+        return ordered collection_name -> [(callback, attr, state), ...].
         '''
 
-        ret = []
-        # attributes.
-        ret.extend(
-            self._select_callbacks(
-                resource.attributes_obj.get_registered_callback_and_options,
-                resource.attributes_obj.attr_obj,
-                state.attributes,
-            ),
-        )
+        ret = {}
         # TODO: relationships
+        for key in ['attributes']:
+            attr_collection = getattr(resource, f'{key}_obj')
+
+            ret[key] = self._select_callbacks(
+                getattr(
+                    attr_collection,
+                    'get_registered_callback_and_options',
+                ),
+                getattr(
+                    attr_collection,
+                    'attr_obj',
+                ),
+                getattr(
+                    state,
+                    key,
+                ),
+            )
+        # TODO: refactor this one.
+        for name in _COLLECTION_NAMES:
+            if name not in ret:
+                ret[name] = []
         return ret
 
     async def callback_kwargs(self, attr, state):
@@ -75,10 +106,14 @@ class ContextRule:
         TODO
         Available keys:
 
+        - state
+        - attr
         - resource_id
-        - ...
         '''
-        return {}
+        return {
+            'attr': attr,
+            'state': state,
+        }
 
     async def load_data_from_state_builder(self, state_builder):
         pass
@@ -115,8 +150,7 @@ def _merge_output_of_callbacks(output_of_callbacks):
     root_gap = output_of_callbacks.root_gap
     ret = root_gap.value if root_gap else {}
 
-    helper(ret, None, output_of_callbacks)
-    return ret
+    return helper(ret, None, output_of_callbacks)
 
 
 class PipelineBase:
@@ -167,39 +201,66 @@ class PipelineBase:
             raise RuntimeError('TODO: input state not valid')
 
     async def _invoke_callbacks(self):
-        callback_and_options = list(await async_call(
+        name2selected = await async_call(
             self.context_rule.select_callbacks,
             self.resource, self.intput_state,
-        ))
-
-        async_gathers = []
-        async_paths = []
-        for callback, attr, state in callback_and_options:
-            kwargs = await async_call(
-                self.context_rule.callback_kwargs,
-                attr, state,
-            )
-            async_gathers.append(
-                async_call(callback, **kwargs),
-            )
-            async_paths.append(
-                attr.bh_path,
-            )
-
-        output_of_callbacks = TreeState()
-        for path, ret in zip(async_paths,
-                             await asyncio.gather(*async_gathers)):
-            output_of_callbacks.touch(path).value = ret
-
-        self.merged_output_of_callbacks = _merge_output_of_callbacks(
-            output_of_callbacks,
         )
+
+        async_collection_names = []
+        async_nested_gathers = []
+        async_nested_paths = []
+
+        for collection_name, callback_and_options in name2selected.items():
+            async_collection_names.append(collection_name)
+
+            async_gathers = []
+            async_paths = []
+
+            for callback, attr, state in callback_and_options:
+                kwargs = await async_call(
+                    self.context_rule.callback_kwargs,
+                    attr, state,
+                )
+                async_gathers.append(
+                    async_call(callback, **kwargs),
+                )
+                async_paths.append(
+                    attr.bh_path,
+                )
+
+            async_nested_gathers.append(async_gathers)
+            async_nested_paths.append(async_paths)
+
+        joined_callbacks = asyncio.gather(
+            *[
+                asyncio.gather(*callbacks)
+                for callbacks in async_nested_gathers
+            ],
+        )
+
+        name2raw_obj = {}
+
+        for name, paths, rets in zip(
+            async_collection_names,
+            async_nested_paths,
+            await joined_callbacks,
+        ):
+            tree_state = TreeState()
+            for path, ret in zip(paths, rets):
+                tree_state.touch(path).value = ret
+
+            name2raw_obj[name] = _merge_output_of_callbacks(tree_state)
+
+        self.merged_output_of_callbacks = \
+            RawOutputStateContainer(**name2raw_obj)
 
     async def _build_output_state(self):
-        self.output_state = self.state_builder.build_output_state(
+        self.output_state = await async_call(
+            self.state_builder.build_output_state,
             self.resource, self.merged_output_of_callbacks,
         )
-        output_state_is_valid = self.context_rule.validate_output_state(
+        output_state_is_valid = await async_call(
+            self.context_rule.validate_output_state,
             self.output_state,
         )
         if not output_state_is_valid:

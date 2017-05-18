@@ -120,7 +120,7 @@ class LeafAttributeInputState(LeafAttributeState):
     InputState don't need to implement serialize.
     '''
 
-    def init_state(self, value, node2statecls):
+    def init_state(self, value=None, node2statecls=None):
         if isinstance(value, abc.Mapping):
             assert value['type'] == self.ATTR_TYPE
             self.bh_value = value['value']
