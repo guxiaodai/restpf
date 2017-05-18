@@ -7,6 +7,8 @@ classes:
 BehaviorTreeRoot is a special case of BehaviorTreeNode.
 """
 
+from restpf.utils.helper_classes import LinkedPath
+
 
 class classproperty:
 
@@ -28,6 +30,8 @@ class BehaviorTreeNode:
         self._bh_children = []
         self._bh_named_children = {}
 
+        self._bh_linked_path = LinkedPath()
+
     def bh_rename(self, name):
         self._bh_name = name
 
@@ -40,6 +44,10 @@ class BehaviorTreeNode:
 
         child._bh_parent = self
         child._bh_root = self._bh_root
+        child._bh_linked_path.set_name_and_parent(
+            child._bh_name,
+            self._bh_linked_path,
+        )
 
         self._bh_children.append(child)
         self._bh_named_children[child._bh_name] = child
@@ -61,6 +69,16 @@ class BehaviorTreeNode:
 
     def bh_named_child(self, name):
         return self._bh_named_children.get(name)
+
+    def bh_remove_named_child(self, name):
+        self._bh_named_children.pop(name, None)
+
+    @property
+    def bh_path(self):
+        if self._bh_linked_path is None:
+            return []
+        else:
+            return iter(self._bh_linked_path)
 
 
 class BehaviorTreeRoot(BehaviorTreeNode):

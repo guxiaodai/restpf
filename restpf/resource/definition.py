@@ -20,25 +20,26 @@ foo.username
 """
 
 import inspect
-import operator
 
 from restpf.utils.constants import (
     HTTPMethodConfig,
+)
+from restpf.utils.helper_classes import (
+    TreeState,
 )
 from .attributes import (
     Attribute,
     Object,
     Integer,
     String,
-    create_ist_from_bh_object,
     AppearanceConfig,
 )
 
 
 class CallbackRegistrar:
 
-    _AVAILABLE_CONTEXT = set(map(
-        operator.attrgetter('value'),
+    _AVAILABLE_CONTEXT = dict(map(
+        lambda method: (method.value, method),
         HTTPMethodConfig,
     ))
 
@@ -52,8 +53,6 @@ class CallbackRegistrar:
         self.callback = None
 
     def register(self):
-        if not self.attr_path:
-            raise RuntimeError('empty path')
         if self.context is None:
             raise RuntimeError('context not set')
 
@@ -61,8 +60,9 @@ class CallbackRegistrar:
 
     def __getattr__(self, name):
         if self.context is None:
+            context = self._AVAILABLE_CONTEXT.get(name)
 
-            if name not in self._AVAILABLE_CONTEXT:
+            if context is None:
                 next_attr_obj = self._attr_obj.bh_named_child(name)
                 if next_attr_obj is None:
                     raise RuntimeError('Invalid attribute: ' + name)
@@ -70,7 +70,7 @@ class CallbackRegistrar:
                 self.attr_path.append(name)
                 self._attr_obj = next_attr_obj
             else:
-                self.context = name
+                self.context = context
 
             return self
         else:
@@ -97,35 +97,26 @@ class CallbackRegistrar:
 
 class CallbackInformation:
 
-    _REGISTERED_CALLBACK_KEY_VALUE = 'value'
-    _REGISTERED_CALLBACK_KEY_NEXT = 'next'
-
     def __init__(self, attr_obj):
-        # [attr path] => (callback, options)
-        self._registered_callback = create_ist_from_bh_object(
-            attr_obj,
-            lambda x: {
-                self._REGISTERED_CALLBACK_KEY_VALUE: {},
-                self._REGISTERED_CALLBACK_KEY_NEXT: x,
-            },
-        )
+        '''
+        (['next', [..., ]] 'value') => (callback, options)
+        '''
+        self._registered_callback = TreeState()
 
     def _locate_registered_callback_tree(self, path):
-        pre_obj = None
-        cur_obj = self._registered_callback
-        for name in path:
-            pre_obj = cur_obj
-            cur_obj = cur_obj[name][self._REGISTERED_CALLBACK_KEY_NEXT]
-
-        return pre_obj[path[-1]][self._REGISTERED_CALLBACK_KEY_VALUE]
+        return self._registered_callback.touch(path, default={})
 
     def _set_callback_and_options(self, path, context, callback, options):
+        assert isinstance(context, HTTPMethodConfig)
+
         obj = self._locate_registered_callback_tree(path)
-        obj[context] = (callback, options)
+        obj.value[context] = (callback, options)
 
     def get_registered_callback_and_options(self, path, context):
+        assert isinstance(context, HTTPMethodConfig)
+
         obj = self._locate_registered_callback_tree(path)
-        return obj.get(context)
+        return obj.value.get(context, (None, None))
 
     def register_callback(self, callback_registrar):
         self._set_callback_and_options(
@@ -220,7 +211,8 @@ class Relationships(AttributeCollection):
     COLLECTION_NAME = 'relationships'
 
     def _check_attr_obj(self, attr_obj):
-        raise NotImplemented
+        # TODO
+        return True
 
 
 class Resource:
@@ -230,8 +222,8 @@ class Resource:
 
         self.id_node = self._generate_id_node(id_attr)
 
-        self.attributes = attributes
-        self.relationships = relationships
+        self._attributes = attributes
+        self._relationships = relationships
 
     def _generate_id_node(self, id_attr):
         if id_attr not in (Integer, String) and \
@@ -248,10 +240,18 @@ class Resource:
         else:
             return id_attr
 
+    @property
+    def attributes_obj(self):
+        return self._attributes
+
+    @property
+    def relationships_obj(self):
+        return self._relationships
+
     def __getattribute__(self, name):
-        obj = super().__getattribute__(name)
         if name in ('attributes', 'relationships'):
             # for callback registrater.
+            obj = super().__getattribute__(f'_{name}')
             return obj.create_callback_registrar()
         else:
-            return obj
+            return super().__getattribute__(name)

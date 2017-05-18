@@ -1,4 +1,5 @@
 import collections.abc as abc
+from functools import wraps
 
 from .attributes import (
     Bool,
@@ -10,6 +11,8 @@ from .attributes import (
     Array,
     Tuple,
     Object,
+    AppearanceConfig,
+    UnknowAttributeConfig,
 )
 from .behavior_tree import (
     BehaviorTreeNodeStateLeaf,
@@ -44,6 +47,40 @@ def create_attribute_state_tree(node, value, node2statecls):
     return state
 
 
+def _check_on_none_value_case(state, attr_context):
+
+    if isinstance(state, LeafAttributeState):
+        is_null = state.bh_value is None
+    elif isinstance(state, NestedAttributeState):
+        is_null = state.bh_children_size == 0
+    else:
+        raise NotImplemented
+
+    if is_null:
+        return (
+            True,
+            attr_context.appear(state.bh_node) is not AppearanceConfig.REQUIRE
+        )
+    else:
+        return (
+            False,
+            None,
+        )
+
+
+def nullable_processor(validator):
+
+    @wraps(validator)
+    def validator_with_nullable_processing(self, attr_context):
+        can_return, flag = _check_on_none_value_case(self, attr_context)
+        if can_return:
+            return flag
+        else:
+            return validator(self, attr_context)
+
+    return validator_with_nullable_processing
+
+
 class LeafAttributeState(BehaviorTreeNodeStateLeaf):
 
     # require subclass to override.
@@ -53,7 +90,8 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
     def init_state(self, value, node2statecls):
         raise NotImplemented
 
-    def validate(self):
+    @nullable_processor
+    def validate(self, attr_context):
         return isinstance(self.bh_value, self.PYTHON_TYPE)
 
     def serialize(self):
@@ -82,7 +120,7 @@ class LeafAttributeInputState(LeafAttributeState):
     InputState don't need to implement serialize.
     '''
 
-    def init_state(self, value, node2statecls):
+    def init_state(self, value=None, node2statecls=None):
         if isinstance(value, abc.Mapping):
             assert value['type'] == self.ATTR_TYPE
             self.bh_value = value['value']
@@ -117,6 +155,12 @@ class NestedAttributeState(BehaviorTreeNodeStateNested):
     @property
     def element_named_attr_states(self):
         return self._bh_named_children
+
+    def element_named_attr_state(self, name):
+        return self.bh_named_child(name)
+
+    def element_remove_named_attr_state(self, name):
+        self.bh_remove_named_child(name)
 
     def init_state(self, value, node2statecls):
         pass
@@ -274,12 +318,13 @@ class ArrayStateCommon(ArrayStateConfig, NestedAttributeState):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
+    @nullable_processor
+    def validate(self, attr_context):
         element_attrcls = self.element_attrcls()
         for element_state in self.element_attr_states:
             if element_state.bh_nodecls is not element_attrcls:
                 return False
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
@@ -364,7 +409,8 @@ class TupleStateCommon(TupleStateConfig):
             )
             self.bh_add_child(element_state)
 
-    def validate(self):
+    @nullable_processor
+    def validate(self, attr_context):
 
         if len(self.element_attrs) != len(self.element_attr_states):
             return False
@@ -375,7 +421,7 @@ class TupleStateCommon(TupleStateConfig):
             )
             if element_state.bh_nodecls is not element_attr:
                 return False
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
@@ -404,6 +450,14 @@ class ObjectStateConfig:
     ATTR_TYPE = 'object'
 
 
+class UnknownStatePlaceholderForObject(LeafAttributeState):
+
+    def __init__(self, name, value):
+        super().__init__()
+        self.bh_rename(name)
+        self.bh_value = value
+
+
 class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
 
     def init_state(self, mapping, node2statecls):
@@ -412,28 +466,52 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
         # recursive construction.
         for element_name, element_value in mapping.items():
             element_attr = self.element_named_attr(element_name)
-            if element_attr is None:
-                raise RuntimeError('cannot find attribute ' + element_name)
 
-            element_state = create_attribute_state_tree(
-                element_attr,
-                element_value,
-                node2statecls,
-            )
+            if element_attr:
+                element_state = create_attribute_state_tree(
+                    element_attr,
+                    element_value,
+                    node2statecls,
+                )
+            else:
+                element_state = UnknownStatePlaceholderForObject(
+                    element_name, element_value,
+                )
+
             self.bh_add_child(element_state)
 
-    def validate(self):
-        if (set(self.element_named_attr_states) !=
-                set(self.element_named_attrs)):
-            return False
+    @nullable_processor
+    def validate(self, attr_context):
+        can_ignore_unknown = (
+            attr_context.unknown(self.bh_node)
+            is UnknowAttributeConfig.IGNORE
+        )
 
-        for name, element_state in self.element_named_attr_states.items():
+        all_attr_names = set(self.element_named_attrs)
+        all_state_names = set(self.element_named_attr_states)
+
+        # for missing keys.
+        for name in (all_attr_names - all_state_names):
+            attr = self.element_named_attr(name)
+            if attr_context.appear(attr) is AppearanceConfig.REQUIRE:
+                return False
+
+        for name in all_state_names:
+            element_state = self.element_named_attr_state(name)
+
+            # process unknown name.
+            if isinstance(element_state, UnknownStatePlaceholderForObject):
+                # conditional raise.
+                if can_ignore_unknown:
+                    continue
+                else:
+                    return False
+
             element_attr = self.bh_relative_nodecls(name)
 
             if element_state.bh_nodecls is not element_attr:
                 return False
-
-            if not element_state.validate():
+            if not element_state.validate(attr_context):
                 return False
 
         return True
@@ -442,8 +520,14 @@ class ObjectStateCommon(ObjectStateConfig, NestedAttributeState):
         return self.__getattr__(name)
 
     def __getattr__(self, name):
+        '''
+        1. Raise error on unregistered name.
+        2. return None for empty child state.
+        '''
+        # make sure name is registered.
+        assert self.element_named_attr(name)
+        # get child state.
         child = self.bh_named_child(name)
-        assert child
         return child
 
 
@@ -452,6 +536,10 @@ class ObjectStateForOutputDefault(ObjectStateCommon):
     def serialize(self):
         ret = {}
         for name, element_state in self.element_named_attr_states.items():
+            # ignore unknown name.
+            if isinstance(element_state, UnknownStatePlaceholderForObject):
+                continue
+            # serialize element.
             ret[name] = element_state.serialize()
         return ret
 

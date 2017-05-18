@@ -1,68 +1,30 @@
+# flake8: noqa
+
 import pytest
 
-from restpf.resource.attributes import (
-    Bool,
-    Integer,
-    Float,
-    String,
-    Array,
-    Tuple,
-    Object,
-    AppearanceConfig,
-)
-
-from restpf.resource.attribute_states import (
-    create_attribute_state_tree,
-
-    BoolStateForOutputDefault,
-    IntegerStateForOutputDefault,
-    FloatStateForOutputDefault,
-    StringStateForOutputDefault,
-    ArrayStateForOutputDefault,
-    TupleStateForOutputDefault,
-    ObjectStateForOutputDefault,
-
-    BoolStateForInputDefault,
-    IntegerStateForInputDefault,
-    FloatStateForInputDefault,
-    StringStateForInputDefault,
-    ArrayStateForInputDefault,
-    TupleStateForInputDefault,
-    ObjectStateForInputDefault,
-)
+from tests.resource.attr_config import *  # noqa
 
 
-def node2statecls_output(node):
-    TO_STATECLS = {
-        Bool: BoolStateForOutputDefault,
-        Integer: IntegerStateForOutputDefault,
-        Float: FloatStateForOutputDefault,
-        String: StringStateForOutputDefault,
-        Array: ArrayStateForOutputDefault,
-        Tuple: TupleStateForOutputDefault,
-        Object: ObjectStateForOutputDefault,
-    }
+class _TestContext:
 
-    return TO_STATECLS[type(node)]
+    cxt = HTTPMethodConfig.GET
 
+    @classmethod
+    def set_context(cls, value):
+        cls.cxt = value
 
-def node2statecls_input(node):
-    TO_STATECLS = {
-        Bool: BoolStateForInputDefault,
-        Integer: IntegerStateForInputDefault,
-        Float: FloatStateForInputDefault,
-        String: StringStateForInputDefault,
-        Array: ArrayStateForInputDefault,
-        Tuple: TupleStateForInputDefault,
-        Object: ObjectStateForInputDefault,
-    }
-
-    return TO_STATECLS[type(node)]
+    @classmethod
+    def gen_attr_context(cls):
+        return AttributeContextOperator(cls.cxt)
 
 
 def _gen_test_result(attr, value, node2statecls):
     state = create_attribute_state_tree(attr, value, node2statecls)
-    return state, state.validate(), state.serialize()
+    return (
+        state,
+        state.validate(_TestContext.gen_attr_context()),
+        state.serialize(),
+    )
 
 
 def gen_test_result_for_output(attr, value):
@@ -228,6 +190,8 @@ def test_tuple_abbr_serialization():
 
 
 def test_object_output():
+    _TestContext.set_context(HTTPMethodConfig.POST)
+
     attr = Object(
         ('foo', Integer()),
         ('bar', String()),
@@ -236,6 +200,12 @@ def test_object_output():
     assert_validate_output(attr, {
         'foo': 42,
         'bar': 'test',
+    })
+
+    assert_validate_output(attr, {
+        'foo': 42,
+        'bar': 'test',
+        'unknown': 'whatever',
     })
 
     assert_not_validate_output(attr, {
@@ -257,6 +227,18 @@ def test_object_output():
             'bar': {'type': 'string', 'value': 'test'},
         },
     )
+
+    _TestContext.set_context(HTTPMethodConfig.GET)
+
+    assert_validate_output(attr, {
+        'bar': 'test',
+    })
+
+    assert_not_validate_output(attr, {
+        'foo': 42,
+        'bar': 'test',
+        'unknown': 'whatever',
+    })
 
 
 def test_object_input():
@@ -300,6 +282,14 @@ def test_appearance_options():
 
     with pytest.raises(AssertionError):
         String(appear_in_get='whatever')
+
+    attr = Integer()
+
+    _TestContext.set_context(HTTPMethodConfig.POST)
+    assert_not_validate_output(attr, None)
+
+    _TestContext.set_context(HTTPMethodConfig.GET)
+    assert_validate_output(attr, None)
 
 
 def test_value_property():
@@ -351,3 +341,27 @@ def test_object_getattr():
     assert state.foo.value == 42
     assert state.bar.value == 'test'
     assert state.get('not an identifier').value == 42
+
+    with pytest.raises(AssertionError):
+        state.whatever
+
+
+def test_object_path():
+    attr = Object({
+        'a': Object({
+            'b': Object({
+                'c': Integer,
+            }),
+        }),
+    })
+
+    state = gen_test_state_for_output(attr, {
+        'a': {
+            'b': {
+                'c': 42,
+            },
+        },
+    })
+
+    assert list(state.a.b.c.bh_path) == ['a', 'b', 'c']
+    assert list(state.bh_path) == []

@@ -1,6 +1,7 @@
 from restpf.resource.attributes import (
     String,
     Object,
+    HTTPMethodConfig,
 )
 from restpf.resource.definition import (
     AttributeCollection,
@@ -18,6 +19,12 @@ def test_registration():
             )),
         )),
     )
+
+    register = ac.create_callback_registrar()
+
+    @register.GET
+    def callback_top_level():
+        return 'top_level'
 
     register = ac.create_callback_registrar()
 
@@ -45,19 +52,23 @@ def test_registration():
 
     accessor = ac.get_registered_callback_and_options
 
-    callback, options = accessor(['foo'], 'GET')
+    callback, options = accessor([], HTTPMethodConfig.GET)
+    assert None is options
+    assert 'top_level' == callback()
+
+    callback, options = accessor(['foo'], HTTPMethodConfig.GET)
     assert {'whatever': 42} == options
     assert 'foo.GET' == callback()
 
-    callback, options = accessor(['foo'], 'POST')
+    callback, options = accessor(['foo'], HTTPMethodConfig.POST)
     assert None is options
     assert 'foo.POST' == callback()
 
-    callback, options = accessor(['a', 'b'], 'POST')
+    callback, options = accessor(['a', 'b'], HTTPMethodConfig.POST)
     assert None is options
     assert 'a.b' == callback()
 
-    callback, options = accessor(['a', 'b', 'bar'], 'PATCH')
+    callback, options = accessor(['a', 'b', 'bar'], HTTPMethodConfig.PATCH)
     assert None is options
     assert 'a.b.bar' == callback()
 
@@ -88,3 +99,4 @@ def test_resource_definition():
         None,
     )
     assert rd.attributes.a.b.bar
+    assert isinstance(rd.attributes_obj, Attributes)
