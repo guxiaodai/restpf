@@ -2,6 +2,8 @@ import pytest
 
 from restpf.utils.helper_functions import (
     async_call,
+    bind_self_with_options,
+    init_named_args,
 )
 
 
@@ -42,3 +44,32 @@ async def test_async_call_kwargs_subset_filtering():
 
     with pytest.raises(RuntimeError):
         await async_call(func1, **{'a': 1})
+
+
+def test_bind_self_with_options():
+
+    class Test:
+
+        def __init__(self, **options):
+            bind_self_with_options(
+                ['foo', 'bar'],
+                self, options,
+            )
+
+    t = Test(foo=1, bar=2, whatever=3)
+    assert 1 == t.foo
+    assert 2 == t.bar
+
+
+def test_init_named_args():
+
+    class Test:
+
+        @init_named_args('foo', 'bar')
+        def __init__(self, a, b=1):
+            self.pack = (a, b)
+
+    t = Test(3, foo=1, b=4, bar=2)
+    assert 1 == t.foo
+    assert 2 == t.bar
+    assert (3, 4) == t.pack

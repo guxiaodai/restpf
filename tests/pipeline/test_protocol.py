@@ -15,6 +15,7 @@ from restpf.resource.definition import (
 from restpf.pipeline.protocol import (
     ContextRule,
     StateTreeBuilder,
+    RepresentationGenerator,
     PipelineBase,
     ResourceState,
     _merge_output_of_callbacks,
@@ -128,6 +129,15 @@ async def test_pipeline():
             )
             return ResourceState(attributes, None, resource_id)
 
+    class TestRepGen(RepresentationGenerator):
+
+        def generate_representation(self, resource, output_state):
+
+            return {
+                'id': output_state.resource_id.serialize(),
+                'attributes': output_state.attributes.serialize(),
+            }
+
     class TestPipeline(PipelineBase):
         pass
 
@@ -148,17 +158,28 @@ async def test_pipeline():
     def process_bar(state):
         return state.value + ' suffix'
 
-    pipeline = TestPipeline(resource, TestContextRule(), TestStateBuilder())
+    pipeline = TestPipeline(
+        resource=resource,
+        context_rule=TestContextRule(),
+        state_builder=TestStateBuilder(),
+        rep_generator=TestRepGen(),
+    )
     await pipeline.run()
 
     expected = {
-        'foo': {
+        'id': {
             'type': 'integer',
-            'value': 52,
+            'value': 42,
         },
-        'bar': {
-            'type': 'string',
-            'value': 'some name suffix',
+        'attributes': {
+            'foo': {
+                'type': 'integer',
+                'value': 52,
+            },
+            'bar': {
+                'type': 'string',
+                'value': 'some name suffix',
+            },
         },
     }
-    assert expected == pipeline.output_state.attributes.serialize()
+    assert expected == pipeline.representation

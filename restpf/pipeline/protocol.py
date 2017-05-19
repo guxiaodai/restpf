@@ -4,6 +4,9 @@ from collections import (
     namedtuple,
 )
 
+from restpf.utils.helper_functions import (
+    init_named_args,
+)
 from restpf.utils.helper_classes import (
     TreeState,
 )
@@ -128,6 +131,12 @@ class StateTreeBuilder:
         raise NotImplemented
 
 
+class RepresentationGenerator:
+
+    async def generate_representation(self, resource, output_state):
+        return {}
+
+
 def _merge_output_of_callbacks(output_of_callbacks):
 
     def helper(ret, child_value, tree_state):
@@ -173,14 +182,12 @@ class PipelineBase:
     6. validate `output_state`.
     '''
 
-    def __init__(self,
-                 resource,
-                 context_rule,
-                 state_builder):
-
-        self.resource = resource
-        self.context_rule = context_rule
-        self.state_builder = state_builder
+    @init_named_args(
+        'resource', 'context_rule',
+        'state_builder', 'rep_generator',
+    )
+    def __init__(self):
+        pass
 
     async def _build_input_state(self):
         await async_call(
@@ -266,10 +273,19 @@ class PipelineBase:
         if not output_state_is_valid:
             raise RuntimeError('TODO: output state not valid')
 
+    async def _generate_representation(self):
+        self.representation = None
+        if self.rep_generator:
+            self.representation = await async_call(
+                self.rep_generator.generate_representation,
+                self.resource, self.output_state,
+            )
+
     async def run(self):
         await self._build_input_state()
         await self._invoke_callbacks()
         await self._build_output_state()
+        await self._generate_representation()
 
 
 class SingleResourcePipeline(PipelineBase):
