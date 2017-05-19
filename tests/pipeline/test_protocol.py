@@ -1,8 +1,6 @@
-# flake8: noqa
-
 import pytest
 
-from tests.resource.attr_config import *  # noqa
+from tests.utils.attr_config import *
 
 from restpf.utils.helper_functions import (
     async_call,

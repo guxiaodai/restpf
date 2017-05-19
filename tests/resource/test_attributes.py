@@ -1,8 +1,6 @@
-# flake8: noqa
-
 import pytest
 
-from tests.resource.attr_config import *  # noqa
+from tests.utils.attr_config import *
 
 
 class _TestContext:

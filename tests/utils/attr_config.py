@@ -1,5 +1,3 @@
-# flake8: noqa
-
 from restpf.resource.attributes import (
     Bool,
     Integer,
