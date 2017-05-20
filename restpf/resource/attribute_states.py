@@ -20,6 +20,34 @@ from .behavior_tree import (
 )
 
 
+def node2statecls_default_output(node):
+    TO_STATECLS = {
+        Bool: BoolStateForOutputDefault,
+        Integer: IntegerStateForOutputDefault,
+        Float: FloatStateForOutputDefault,
+        String: StringStateForOutputDefault,
+        Array: ArrayStateForOutputDefault,
+        Tuple: TupleStateForOutputDefault,
+        Object: ObjectStateForOutputDefault,
+    }
+
+    return TO_STATECLS[type(node)]
+
+
+def node2statecls_default_input(node):
+    TO_STATECLS = {
+        Bool: BoolStateForInputDefault,
+        Integer: IntegerStateForInputDefault,
+        Float: FloatStateForInputDefault,
+        String: StringStateForInputDefault,
+        Array: ArrayStateForInputDefault,
+        Tuple: TupleStateForInputDefault,
+        Object: ObjectStateForInputDefault,
+    }
+
+    return TO_STATECLS[type(node)]
+
+
 def create_attribute_state_tree(node, value, node2statecls):
     '''
     1. Attribute classes has nothing to do with side effect, including building
