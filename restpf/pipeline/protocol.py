@@ -7,11 +7,16 @@ from collections import (
 
 from restpf.utils.helper_functions import (
     method_named_args,
+    async_call,
 )
 from restpf.utils.helper_classes import (
     TreeState,
 )
-from restpf.utils.helper_functions import async_call
+
+from restpf.resource.attribute_states import (
+    create_attribute_state_tree_for_input,
+    create_attribute_state_tree_for_output,
+)
 from restpf.resource.attributes import (
     AttributeContextOperator,
 )
@@ -229,6 +234,18 @@ class _ContextRuleBinder:
 
 
 class StateTreeBuilder(_ContextRuleBinder):
+
+    def _get_id_state_for_input(self, resource):
+        return create_attribute_state_tree_for_input(
+            resource.id_obj,
+            self.context_rule.raw_resource_id,
+        )
+
+    def _get_id_state_for_output(self, resource):
+        return create_attribute_state_tree_for_output(
+            resource.id_obj,
+            self.context_rule.raw_resource_id,
+        )
 
     async def build_input_state(self, resource):
         raise NotImplemented

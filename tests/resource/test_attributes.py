@@ -260,6 +260,10 @@ def test_object_input():
         },
     })
 
+    attr = Object()
+    assert_validate_input(attr, {})
+    assert_validate_output(attr, {})
+
 
 def test_object_mapping_constructor():
     attr = Object({
