@@ -14,7 +14,7 @@ from .attributes import (
     AppearanceConfig,
     UnknowAttributeConfig,
 )
-from .behavior_tree import (
+from restpf.utils.behavior_tree import (
     BehaviorTreeNodeStateLeaf,
     BehaviorTreeNodeStateNested,
 )

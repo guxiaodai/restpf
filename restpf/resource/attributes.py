@@ -49,7 +49,7 @@ from restpf.utils.constants import (
 
 from restpf.utils.helper_functions import to_iterable
 from restpf.utils.helper_classes import ContextOperator
-from .behavior_tree import BehaviorTreeNode
+from restpf.utils.behavior_tree import BehaviorTreeNode
 
 
 def create_ist_from_bh_object(attr_obj, value_binder=lambda x: x):
