@@ -5,9 +5,8 @@ from restpf.resource.attributes import (
     HTTPMethodConfig,
 )
 from restpf.resource.attribute_states import (
-    create_attribute_state_tree,
-    node2statecls_default_input,
-    node2statecls_default_output,
+    create_attribute_state_tree_for_input,
+    create_attribute_state_tree_for_output,
 )
 from restpf.pipeline.protocol import (
     ContextRule,
@@ -32,15 +31,11 @@ class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
 
     def _get_id_state(self, resource, is_input):
         if is_input:
-            mapping = node2statecls_default_input
+            creator = create_attribute_state_tree_for_input
         else:
-            mapping = node2statecls_default_output
+            creator = create_attribute_state_tree_for_output
 
-        return create_attribute_state_tree(
-            resource.id_obj,
-            self.raw_resource_id,
-            mapping,
-        )
+        return creator(resource.id_obj, self.raw_resource_id)
 
     def build_input_state(self, resource):
         return ResourceState(
@@ -51,15 +46,13 @@ class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
 
     def build_output_state(self, resource, raw_obj):
         return ResourceState(
-            attributes=create_attribute_state_tree(
+            attributes=create_attribute_state_tree_for_output(
                 resource.attributes_obj.attr_obj,
                 raw_obj.attributes,
-                node2statecls_default_output,
             ),
-            relationships=create_attribute_state_tree(
+            relationships=create_attribute_state_tree_for_output(
                 resource.relationships_obj.attr_obj,
                 raw_obj.relationships,
-                node2statecls_default_output,
             ),
             resource_id=self._get_id_state(resource, False),
         )

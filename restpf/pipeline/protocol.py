@@ -136,7 +136,6 @@ class ContextRule:
         '''
 
         ret = {}
-        # TODO: relationships
         for key in ['attributes', 'relationships']:
             if getattr(resource, key) is None:
                 continue
@@ -157,7 +156,7 @@ class ContextRule:
                     key,
                 ),
             )
-        # TODO: refactor this one.
+
         for name in _COLLECTION_NAMES:
             if name not in ret:
                 ret[name] = []

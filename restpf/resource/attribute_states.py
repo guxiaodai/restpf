@@ -20,34 +20,6 @@ from .behavior_tree import (
 )
 
 
-def node2statecls_default_output(node):
-    TO_STATECLS = {
-        Bool: BoolStateForOutputDefault,
-        Integer: IntegerStateForOutputDefault,
-        Float: FloatStateForOutputDefault,
-        String: StringStateForOutputDefault,
-        Array: ArrayStateForOutputDefault,
-        Tuple: TupleStateForOutputDefault,
-        Object: ObjectStateForOutputDefault,
-    }
-
-    return TO_STATECLS[type(node)]
-
-
-def node2statecls_default_input(node):
-    TO_STATECLS = {
-        Bool: BoolStateForInputDefault,
-        Integer: IntegerStateForInputDefault,
-        Float: FloatStateForInputDefault,
-        String: StringStateForInputDefault,
-        Array: ArrayStateForInputDefault,
-        Tuple: TupleStateForInputDefault,
-        Object: ObjectStateForInputDefault,
-    }
-
-    return TO_STATECLS[type(node)]
-
-
 def create_attribute_state_tree(node, value, node2statecls):
     '''
     1. Attribute classes has nothing to do with side effect, including building
@@ -581,3 +553,57 @@ class ObjectStateForInputDefault(ObjectStateCommon):
 
     def serialize(self):
         return None
+
+
+def node2statecls_generator(*state_clses):
+
+    def _decorator(func):
+        TO_STATECLS = {s.BH_NODECLS: s for s in state_clses}
+
+        @wraps(func)
+        def _wrapper(node):
+            return TO_STATECLS[type(node)]
+
+        return _wrapper
+
+    return _decorator
+
+
+@node2statecls_generator(
+    BoolStateForOutputDefault,
+    IntegerStateForOutputDefault,
+    FloatStateForOutputDefault,
+    StringStateForOutputDefault,
+    ArrayStateForOutputDefault,
+    TupleStateForOutputDefault,
+    ObjectStateForOutputDefault,
+)
+def node2statecls_default_output():
+    pass
+
+
+@node2statecls_generator(
+    BoolStateForInputDefault,
+    IntegerStateForInputDefault,
+    FloatStateForInputDefault,
+    StringStateForInputDefault,
+    ArrayStateForInputDefault,
+    TupleStateForInputDefault,
+    ObjectStateForInputDefault,
+)
+def node2statecls_default_input():
+    pass
+
+
+def create_attribute_state_tree_for_input(node, value):
+    return create_attribute_state_tree(
+        node, value,
+        node2statecls_default_input,
+    )
+
+
+def create_attribute_state_tree_for_output(node, value):
+    return create_attribute_state_tree(
+        node, value,
+        node2statecls_default_output,
+    )
