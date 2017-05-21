@@ -82,11 +82,12 @@ class CallbackRegistrar:
         '''
         Meaningful options:
 
-        - before_all: If is set, this callback will be executed before all
+        - before_all: If is set, this callback(s) will be executed before all
         other callbacks. For a resource, at most one callback can be labeled as
         before_all.
         - run_after: Assign a callback that was registered. Then this callback
         is guaranteed to be executed after that callback.
+        - after_all: Similar to before_all, but for the last execution.
         '''
 
         if callback:
@@ -228,6 +229,11 @@ class Relationships(AttributeCollection):
         return True
 
 
+class SpecialHooks(AttributeCollection):
+
+    COLLECTION_NAME = 'special_hooks'
+
+
 class Resource:
 
     def __init__(self,
@@ -244,6 +250,7 @@ class Resource:
         )
         self._attributes = attributes
         self._relationships = relationships or Relationships()
+        self._special_hooks = self._generate_special_hooks()
 
     def _generate_id_obj(self, id_attr, id_appear_in_post):
         if id_attr not in (Integer, String) and \
@@ -260,6 +267,12 @@ class Resource:
         else:
             return id_attr
 
+    def _generate_special_hooks(self):
+        return SpecialHooks({
+            'before_all': Integer,
+            'after_all': Integer,
+        })
+
     @property
     def attributes_obj(self):
         return self._attributes
@@ -268,8 +281,12 @@ class Resource:
     def relationships_obj(self):
         return self._relationships
 
+    @property
+    def special_hooks_obj(self):
+        return self._special_hooks
+
     def __getattribute__(self, name):
-        if name in ('attributes', 'relationships'):
+        if name in ('attributes', 'relationships', 'special_hooks'):
             # for callback registrater.
             obj = super().__getattribute__(f'_{name}')
             return obj.create_callback_registrar()

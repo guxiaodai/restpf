@@ -39,6 +39,7 @@ class UnknowAttributeConfig(EnumByUpperCaseName):
 class CallbackRegistrarOptions(EnumByLowerCaseName):
 
     BEFORE_ALL = auto()
+    AFTER_ALL = auto()
     RUN_AFTER = auto()
 
 

@@ -360,7 +360,7 @@ class PipelineBase:
                 callback2options[callback] = options
 
                 parallel_groups_of_callbacks_input.append(
-                    (callback, options),
+                    (callback, options.get('options') or {}),
                 )
 
         name2raw_obj = defaultdict(TreeState)

@@ -84,6 +84,8 @@ def method_named_args(*names):
 # restricted options only contains CallbackRegistrarOptions.
 def parallel_groups_of_callbacks(callback_and_restricted_options):
     root = None
+    last = None
+
     children = defaultdict(set)
     parents = defaultdict(set)
 
@@ -93,12 +95,14 @@ def parallel_groups_of_callbacks(callback_and_restricted_options):
     # one pass processing.
     for callback, options in callback_and_restricted_options:
 
+        before_all = options.get(CallbackRegistrarOptions.BEFORE_ALL.value)
+        after_all = options.get(CallbackRegistrarOptions.AFTER_ALL.value)
+        run_after = options.get(CallbackRegistrarOptions.RUN_AFTER.value)
+
         # check root.
-        if options.get(CallbackRegistrarOptions.BEFORE_ALL):
-            if options.get(CallbackRegistrarOptions.RUN_AFTER):
-                raise RuntimeError(
-                    'Cannot set both before_all and run_after.',
-                )
+        if before_all:
+            if after_all or run_after:
+                raise RuntimeError('Conflict on before_all.')
             if root is None:
                 root = callback
                 # to make sure search_starts not doesn't contain root.
@@ -109,8 +113,20 @@ def parallel_groups_of_callbacks(callback_and_restricted_options):
                     'Already set before_all: {}'.format(str(root)),
                 )
 
+        # check last.
+        if after_all:
+            if before_all:
+                raise RuntimeError('Conflict on after_all.')
+            if last is None:
+                last = callback
+                continue
+            else:
+                raise RuntimeError(
+                    'Already set after_all: {}'.format(str(last)),
+                )
+
         # check precedent.
-        parent = options.get(CallbackRegistrarOptions.RUN_AFTER)
+        parent = run_after
 
         if inspect.isfunction(parent):
             children[parent].add(callback)
@@ -194,5 +210,8 @@ def parallel_groups_of_callbacks(callback_and_restricted_options):
 
         parallel_groups.append(parallel_group)
         groups = list(filter(bool, groups))
+
+    if last:
+        parallel_groups.append([last])
 
     return parallel_groups

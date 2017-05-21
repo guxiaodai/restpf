@@ -1,6 +1,5 @@
 import pytest
 
-from restpf.utils.constants import CallbackRegistrarOptions
 from restpf.utils.helper_functions import (
     async_call,
     bind_self_with_options,
@@ -93,7 +92,7 @@ def testparallel_groups_of_callbacks():
 
     # with root.
     groups = parallel_groups_of_callbacks([
-        (a, {CallbackRegistrarOptions.BEFORE_ALL: True}),
+        (a, {'before_all': True}),
         (b, {}),
         (c, {}),
         (d, {}),
@@ -115,8 +114,8 @@ def testparallel_groups_of_callbacks():
     # chaining.
     groups = parallel_groups_of_callbacks([
         (a, {}),
-        (b, {CallbackRegistrarOptions.RUN_AFTER: a}),
-        (c, {CallbackRegistrarOptions.RUN_AFTER: b}),
+        (b, {'run_after': a}),
+        (c, {'run_after': b}),
         (d, {}),
     ])
     assert 3 == len(groups)
@@ -128,7 +127,7 @@ def testparallel_groups_of_callbacks():
     groups = parallel_groups_of_callbacks([
         (a, {}),
         (b, {}),
-        (c, {CallbackRegistrarOptions.RUN_AFTER: [a, b]}),
+        (c, {'run_after': [a, b]}),
         (d, {}),
     ])
     assert 2 == len(groups)
@@ -139,10 +138,21 @@ def testparallel_groups_of_callbacks():
     groups = parallel_groups_of_callbacks([
         (a, {}),
         (b, {}),
-        (c, {CallbackRegistrarOptions.RUN_AFTER: b}),
-        (d, {CallbackRegistrarOptions.RUN_AFTER: [a, b, c]}),
+        (c, {'run_after': b}),
+        (d, {'run_after': [a, b, c]}),
     ])
     assert 3 == len(groups)
     assert set([a, b]) == set(groups[0])
     assert set([c]) == set(groups[1])
     assert set([d]) == set(groups[2])
+
+    # after_all.
+    groups = parallel_groups_of_callbacks([
+        (a, {}),
+        (b, {}),
+        (c, {}),
+        (d, {'after_all': True}),
+    ])
+    assert 2 == len(groups)
+    assert set([a, b, c]) == set(groups[0])
+    assert set([d]) == set(groups[1])
