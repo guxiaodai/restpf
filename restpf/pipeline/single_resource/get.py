@@ -6,7 +6,7 @@ from restpf.resource.attribute_states import (
     create_attribute_state_tree_for_output,
 )
 from restpf.pipeline.protocol import (
-    ContextRuleWithResourceID,
+    ContextRuleWithInputBinding,
     StateTreeBuilder,
     RepresentationGenerator,
     ResourceState,
@@ -15,9 +15,13 @@ from restpf.pipeline.protocol import (
 )
 
 
-class GetSingleResourceContextRule(ContextRuleWithResourceID):
+class GetSingleResourceContextRule(metaclass=ContextRuleWithInputBinding):
 
     HTTPMethod = HTTPMethodConfig.GET
+
+    INPUT_ATTR2KWARG = {
+        'raw_resource_id': 'resource_id',
+    }
 
 
 class GetSingleResourceStateTreeBuilder(StateTreeBuilder):

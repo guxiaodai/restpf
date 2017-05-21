@@ -177,21 +177,48 @@ class ContextRule:
         }
 
 
-class ContextRuleWithResourceID(ContextRule):
+class ContextRuleWithInputBinding(type):
 
-    @method_named_args('raw_resource_id')
-    def __init__(self):
-        pass
+    @classmethod
+    def _inject_methods(cls, attr2kwarg, resultcls):
 
-    async def callback_kwargs(self, attr, state):
-        ret = await async_call(
-            super().callback_kwargs,
-            attr, state,
-        )
-        ret.update({
-            'resource_id': self.raw_resource_id,
-        })
-        return ret
+        # build __init__.
+        @method_named_args(*attr2kwarg.keys())
+        def __init__(self):
+            pass
+
+        resultcls.__init__ = __init__
+
+        # build callback_kwargs.
+        async def callback_kwargs(self, attr, state):
+            ret = await async_call(
+                super(resultcls, self).callback_kwargs,
+                attr, state,
+            )
+            ret.update({
+                kwarg_name: getattr(self, attr_name)
+                for attr_name, kwarg_name in attr2kwarg.items()
+            })
+            return ret
+
+        resultcls.callback_kwargs = callback_kwargs
+
+    def __new__(cls, name, bases, namespace):
+        # get mapping: attr_name -> kwarg_name
+        attr2kwarg = namespace.get('INPUT_ATTR2KWARG')
+
+        # generate class first.
+        if attr2kwarg:
+            # inject base class.
+            bases = bases + (ContextRule,)
+
+        resultcls = type.__new__(cls, name, bases, namespace)
+
+        if attr2kwarg:
+            # only trigger when the INPUT_ATTR2KWARG is defined.
+            cls._inject_methods(attr2kwarg, resultcls)
+
+        return resultcls
 
 
 class _ContextRuleBinder:
