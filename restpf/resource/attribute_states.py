@@ -553,3 +553,57 @@ class ObjectStateForInputDefault(ObjectStateCommon):
 
     def serialize(self):
         return None
+
+
+def node2statecls_generator(*state_clses):
+
+    def _decorator(func):
+        TO_STATECLS = {s.BH_NODECLS: s for s in state_clses}
+
+        @wraps(func)
+        def _wrapper(node):
+            return TO_STATECLS[type(node)]
+
+        return _wrapper
+
+    return _decorator
+
+
+@node2statecls_generator(
+    BoolStateForOutputDefault,
+    IntegerStateForOutputDefault,
+    FloatStateForOutputDefault,
+    StringStateForOutputDefault,
+    ArrayStateForOutputDefault,
+    TupleStateForOutputDefault,
+    ObjectStateForOutputDefault,
+)
+def node2statecls_default_output():
+    pass
+
+
+@node2statecls_generator(
+    BoolStateForInputDefault,
+    IntegerStateForInputDefault,
+    FloatStateForInputDefault,
+    StringStateForInputDefault,
+    ArrayStateForInputDefault,
+    TupleStateForInputDefault,
+    ObjectStateForInputDefault,
+)
+def node2statecls_default_input():
+    pass
+
+
+def create_attribute_state_tree_for_input(node, value):
+    return create_attribute_state_tree(
+        node, value,
+        node2statecls_default_input,
+    )
+
+
+def create_attribute_state_tree_for_output(node, value):
+    return create_attribute_state_tree(
+        node, value,
+        node2statecls_default_output,
+    )

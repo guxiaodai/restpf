@@ -1,8 +1,6 @@
-# flake8: noqa
-
 import pytest
 
-from tests.resource.attr_config import *  # noqa
+from tests.utils.attr_config import *
 
 from restpf.utils.helper_functions import (
     async_call,
@@ -17,9 +15,11 @@ from restpf.resource.definition import (
 from restpf.pipeline.protocol import (
     ContextRule,
     StateTreeBuilder,
+    RepresentationGenerator,
     PipelineBase,
     ResourceState,
     _merge_output_of_callbacks,
+    PipelineRunner,
 )
 
 
@@ -105,12 +105,12 @@ async def test_pipeline():
                     'foo': 42,
                     'bar': 'some name',
                 },
-                node2statecls_input,
+                node2statecls_default_input,
             )
             resource_id = create_attribute_state_tree(
-                resource.id_node,
+                resource.id_obj,
                 None,
-                node2statecls_input,
+                node2statecls_default_input,
             )
             return ResourceState(attributes, None, resource_id)
 
@@ -119,16 +119,25 @@ async def test_pipeline():
                 resource.attributes_obj.attr_obj,
                 # output.
                 raw_obj.attributes,
-                node2statecls_output,
+                node2statecls_default_output,
             )
 
             assert not raw_obj.resource_id
             resource_id = create_attribute_state_tree(
-                resource.id_node,
+                resource.id_obj,
                 42,
-                node2statecls_output,
+                node2statecls_default_output,
             )
             return ResourceState(attributes, None, resource_id)
+
+    class TestRepGen(RepresentationGenerator):
+
+        def generate_representation(self, resource, output_state):
+
+            return {
+                'id': output_state.resource_id.serialize(),
+                'attributes': output_state.attributes.serialize(),
+            }
 
     class TestPipeline(PipelineBase):
         pass
@@ -150,17 +159,35 @@ async def test_pipeline():
     def process_bar(state):
         return state.value + ' suffix'
 
-    pipeline = TestPipeline(resource, TestContextRule(), TestStateBuilder())
-    await pipeline.run()
+    class TestPipelineRunner(PipelineRunner):
+
+        CONTEXT_RULE_CLS = TestContextRule
+        STATE_TREE_BUILDER_CLS = TestStateBuilder
+        REPRESENTATION_GENERATOR_CLS = TestRepGen
+        PIPELINE_CLS = TestPipeline
+
+    tp = TestPipelineRunner()
+    tp.build_context_rule()
+    tp.build_state_tree_builder()
+    tp.build_representation_generator()
+    tp.set_resource(resource)
+
+    pipeline = await tp.run_pipeline()
 
     expected = {
-        'foo': {
+        'id': {
             'type': 'integer',
-            'value': 52,
+            'value': 42,
         },
-        'bar': {
-            'type': 'string',
-            'value': 'some name suffix',
+        'attributes': {
+            'foo': {
+                'type': 'integer',
+                'value': 52,
+            },
+            'bar': {
+                'type': 'string',
+                'value': 'some name suffix',
+            },
         },
     }
-    assert expected == pipeline.output_state.attributes.serialize()
+    assert expected == pipeline.representation

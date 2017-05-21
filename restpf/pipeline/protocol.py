@@ -1,9 +1,13 @@
 import asyncio
+from functools import wraps
 from collections import (
     deque,
     namedtuple,
 )
 
+from restpf.utils.helper_functions import (
+    method_named_args,
+)
 from restpf.utils.helper_classes import (
     TreeState,
 )
@@ -13,7 +17,7 @@ from restpf.resource.attributes import (
 )
 
 
-# `state`, `intput_state`, `output_state` should be instance of ResourceState.
+# `state`, `input_state`, `output_state` should be instance of ResourceState.
 _COLLECTION_NAMES = ['attributes', 'relationships', 'resource_id']
 
 ResourceState = namedtuple(
@@ -27,17 +31,72 @@ RawOutputStateContainer = namedtuple(
 )
 
 
+def _meta_build(method):
+    METHOD_PREFIX = 'build_'
+
+    attr_name = method.__name__[len(METHOD_PREFIX):]
+    cls_name = attr_name.upper() + '_CLS'
+
+    @wraps(method)
+    def _wrapper(self, *args, **kwargs):
+        setattr(
+            self, attr_name,
+            getattr(self, cls_name)(*args, **kwargs),
+        )
+
+    return _wrapper
+
+
+class PipelineRunner:
+
+    CONTEXT_RULE_CLS = None
+    STATE_TREE_BUILDER_CLS = None
+    REPRESENTATION_GENERATOR_CLS = None
+    PIPELINE_CLS = None
+
+    @_meta_build
+    def build_context_rule(self):
+        pass
+
+    @_meta_build
+    def build_state_tree_builder(self):
+        pass
+
+    @_meta_build
+    def build_representation_generator(self):
+        pass
+
+    def set_resource(self, resource):
+        self.resource = resource
+
+    async def run_pipeline(self):
+        pipeline = self.PIPELINE_CLS(
+            resource=self.resource,
+            context_rule=self.context_rule,
+            state_builder=self.state_tree_builder,
+            rep_generator=self.representation_generator,
+        )
+        await pipeline.run()
+        return pipeline
+
+
 class ContextRule:
 
     HTTPMethod = None
 
     def _default_validator(self, state):
         context = AttributeContextOperator(self.HTTPMethod)
-        return all([
-            state.resource_id.validate(context),
-            state.attributes.validate(context),
-            # TODO: relationships.
-        ])
+        return all(map(
+            lambda x: x.validate(context),
+            filter(
+                bool,
+                [
+                    state.resource_id,
+                    state.attributes,
+                    state.relationships,
+                ],
+            ),
+        ))
 
     async def validate_input_state(self, state):
         return self._default_validator(state)
@@ -77,8 +136,10 @@ class ContextRule:
         '''
 
         ret = {}
-        # TODO: relationships
-        for key in ['attributes']:
+        for key in ['attributes', 'relationships']:
+            if getattr(resource, key) is None:
+                continue
+
             attr_collection = getattr(resource, f'{key}_obj')
 
             ret[key] = self._select_callbacks(
@@ -95,7 +156,7 @@ class ContextRule:
                     key,
                 ),
             )
-        # TODO: refactor this one.
+
         for name in _COLLECTION_NAMES:
             if name not in ret:
                 ret[name] = []
@@ -115,17 +176,44 @@ class ContextRule:
             'state': state,
         }
 
-    async def load_data_from_state_builder(self, state_builder):
+
+class ContextRuleWithResourceID(ContextRule):
+
+    @method_named_args('raw_resource_id')
+    def __init__(self):
+        pass
+
+    async def callback_kwargs(self, attr, state):
+        ret = await async_call(
+            super().callback_kwargs,
+            attr, state,
+        )
+        ret.update({
+            'resource_id': self.raw_resource_id,
+        })
+        return ret
+
+
+class _ContextRuleBinder:
+
+    @method_named_args('context_rule')
+    def bind_context_rule(self):
         pass
 
 
-class StateTreeBuilder:
+class StateTreeBuilder(_ContextRuleBinder):
 
     async def build_input_state(self, resource):
         raise NotImplemented
 
     async def build_output_state(self, resource, raw_obj):
         raise NotImplemented
+
+
+class RepresentationGenerator(_ContextRuleBinder):
+
+    async def generate_representation(self, resource, output_state):
+        return {}
 
 
 def _merge_output_of_callbacks(output_of_callbacks):
@@ -165,45 +253,48 @@ class PipelineBase:
 
     Steps of pipeline:
 
-    1. create `intput_state`.
-    2. validate `intput_state`.
+    1. create `input_state`.
+    2. validate `input_state`.
     3. generate callback list.
     4. call callbacks and collect strucutred return values.
     5. create `output_state`.
     6. validate `output_state`.
     '''
 
-    def __init__(self,
-                 resource,
-                 context_rule,
-                 state_builder):
+    @method_named_args(
+        'resource', 'context_rule',
+        'state_builder', 'rep_generator',
+    )
+    def __init__(self):
+        '''
+        1. `context_rule` holds all the states of input.
+        2. other entities all reference `context_rule`.
+        '''
 
-        self.resource = resource
-        self.context_rule = context_rule
-        self.state_builder = state_builder
-
-    async def _build_input_state(self):
-        await async_call(
-            self.context_rule.load_data_from_state_builder,
-            self.state_builder,
+        self.state_builder.bind_context_rule(
+            context_rule=self.context_rule,
+        )
+        self.rep_generator.bind_context_rule(
+            context_rule=self.context_rule,
         )
 
-        self.intput_state = await async_call(
+    async def _build_input_state(self):
+        self.input_state = await async_call(
             self.state_builder.build_input_state,
             self.resource,
         )
 
-        intput_state_is_valid = await async_call(
+        input_state_is_valid = await async_call(
             self.context_rule.validate_input_state,
-            self.intput_state,
+            self.input_state,
         )
-        if not intput_state_is_valid:
+        if not input_state_is_valid:
             raise RuntimeError('TODO: input state not valid')
 
     async def _invoke_callbacks(self):
         name2selected = await async_call(
             self.context_rule.select_callbacks,
-            self.resource, self.intput_state,
+            self.resource, self.input_state,
         )
 
         async_collection_names = []
@@ -266,10 +357,19 @@ class PipelineBase:
         if not output_state_is_valid:
             raise RuntimeError('TODO: output state not valid')
 
+    async def _generate_representation(self):
+        self.representation = None
+        if self.rep_generator:
+            self.representation = await async_call(
+                self.rep_generator.generate_representation,
+                self.resource, self.output_state,
+            )
+
     async def run(self):
         await self._build_input_state()
         await self._invoke_callbacks()
         await self._build_output_state()
+        await self._generate_representation()
 
 
 class SingleResourcePipeline(PipelineBase):

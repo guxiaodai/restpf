@@ -1,8 +1,6 @@
-# flake8: noqa
-
 import pytest
 
-from tests.resource.attr_config import *  # noqa
+from tests.utils.attr_config import *
 
 
 class _TestContext:
@@ -28,19 +26,19 @@ def _gen_test_result(attr, value, node2statecls):
 
 
 def gen_test_result_for_output(attr, value):
-    return _gen_test_result(attr, value, node2statecls_output)
+    return _gen_test_result(attr, value, node2statecls_default_output)
 
 
 def gen_test_state_for_output(attr, value):
-    return _gen_test_result(attr, value, node2statecls_output)[0]
+    return _gen_test_result(attr, value, node2statecls_default_output)[0]
 
 
 def gen_test_result_for_input(attr, value):
-    return _gen_test_result(attr, value, node2statecls_input)
+    return _gen_test_result(attr, value, node2statecls_default_input)
 
 
 def gen_test_state_for_input(attr, value):
-    return _gen_test_result(attr, value, node2statecls_input)[0]
+    return _gen_test_result(attr, value, node2statecls_default_input)[0]
 
 
 def _assert_validate(attr, value, result, node2statecls):
@@ -49,19 +47,19 @@ def _assert_validate(attr, value, result, node2statecls):
 
 
 def assert_validate_output(attr, value):
-    _assert_validate(attr, value, True, node2statecls_output)
+    _assert_validate(attr, value, True, node2statecls_default_output)
 
 
 def assert_not_validate_output(attr, value):
-    _assert_validate(attr, value, False, node2statecls_output)
+    _assert_validate(attr, value, False, node2statecls_default_output)
 
 
 def assert_validate_input(attr, value):
-    _assert_validate(attr, value, True, node2statecls_input)
+    _assert_validate(attr, value, True, node2statecls_default_input)
 
 
 def assert_not_validate_input(attr, value):
-    _assert_validate(attr, value, False, node2statecls_input)
+    _assert_validate(attr, value, False, node2statecls_default_input)
 
 
 def _assert_serialize(attr, value, expected, node2statecls):
@@ -70,11 +68,11 @@ def _assert_serialize(attr, value, expected, node2statecls):
 
 
 def assert_serialize_output(attr, value, expected):
-    _assert_serialize(attr, value, expected, node2statecls_output)
+    _assert_serialize(attr, value, expected, node2statecls_default_output)
 
 
 def assert_serialize_input(attr, value, expected):
-    _assert_serialize(attr, value, expected, node2statecls_input)
+    _assert_serialize(attr, value, expected, node2statecls_default_input)
 
 
 def test_bool():

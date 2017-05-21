@@ -1,22 +1,21 @@
 import inspect
 import collections.abc as abc
+from functools import wraps
 
 
 def to_iterable(element):
-    assert element
-
     if not isinstance(element, abc.Iterable):
         element = (element,)
     return element
 
 
-_async_call_func_param_cache = {}
+_extract_kwargs_subset_cache = {}
 
 
-def _async_call_extract_kwargs_subset(func, kwargs):
+def _extract_kwargs_subset(func, kwargs):
 
-    if func in _async_call_func_param_cache:
-        params_all, params_without_default = _async_call_func_param_cache[func]
+    if func in _extract_kwargs_subset_cache:
+        params_all, params_without_default = _extract_kwargs_subset_cache[func]
 
     else:
         sig_parameters = inspect.signature(func).parameters
@@ -27,7 +26,7 @@ def _async_call_extract_kwargs_subset(func, kwargs):
             params_all,
         ))
 
-        _async_call_func_param_cache[func] = (
+        _extract_kwargs_subset_cache[func] = (
             params_all, params_without_default,
         )
 
@@ -45,9 +44,32 @@ def _async_call_extract_kwargs_subset(func, kwargs):
 async def async_call(func, *args, **kwargs):
     if not args:
         # turn on kwargs filtering.
-        kwargs = _async_call_extract_kwargs_subset(func, kwargs)
+        kwargs = _extract_kwargs_subset(func, kwargs)
 
     if inspect.iscoroutinefunction(func):
         return await func(*args, **kwargs)
     else:
         return func(*args, **kwargs)
+
+
+def bind_self_with_options(names, self, options):
+    for name in names:
+        setattr(self, name, options.get(name))
+
+
+def method_named_args(*names):
+
+    def _decorator(init):
+
+        @wraps(init)
+        def _wrapper(self, *args, **kwargs):
+            bind_self_with_options(names, self, kwargs)
+            # remove from kwargs.
+            for name in names:
+                kwargs.pop(name, None)
+            # pass to original init.
+            init(self, *args, **kwargs)
+
+        return _wrapper
+
+    return _decorator

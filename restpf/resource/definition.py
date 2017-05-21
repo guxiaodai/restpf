@@ -217,23 +217,30 @@ class Relationships(AttributeCollection):
 
 class Resource:
 
-    def __init__(self, name, attributes, relationships, id_attr=Integer):
+    def __init__(self,
+                 name,
+                 attributes,
+                 relationships=None,
+                 id_attr=Integer,
+                 id_appear_in_post=AppearanceConfig.PROHIBITE):
+
         self.name = name
 
-        self.id_node = self._generate_id_node(id_attr)
-
+        self.id_obj = self._generate_id_obj(
+            id_attr, id_appear_in_post,
+        )
         self._attributes = attributes
-        self._relationships = relationships
+        self._relationships = relationships or Relationships()
 
-    def _generate_id_node(self, id_attr):
+    def _generate_id_obj(self, id_attr, id_appear_in_post):
         if id_attr not in (Integer, String) and \
                 not isinstance(id_attr, (Integer, String)):
-            raise RuntimeError('_generate_id_node')
+            raise RuntimeError('_generate_id_obj')
 
         if inspect.isclass(id_attr):
             return id_attr(
                 appear_in_get=AppearanceConfig.REQUIRE,
-                appear_in_post=AppearanceConfig.PROHIBITE,
+                appear_in_post=id_appear_in_post,
                 appear_in_patch=AppearanceConfig.REQUIRE,
                 appear_in_put=AppearanceConfig.REQUIRE,
             )
