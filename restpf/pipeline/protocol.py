@@ -3,11 +3,13 @@ from functools import wraps
 from collections import (
     deque,
     namedtuple,
+    defaultdict,
 )
 
 from restpf.utils.helper_functions import (
     method_named_args,
     async_call,
+    parallel_groups_of_callbacks,
 )
 from restpf.utils.helper_classes import (
     TreeState,
@@ -123,7 +125,14 @@ class ContextRule:
 
             if callback and (state or root_state is None):
                 ret.append(
-                    (callback, attr, state),
+                    (
+                        callback,
+                        {
+                            'attr': attr,
+                            'state': state,
+                            'options': options,
+                        },
+                    ),
                 )
 
             for name, child_attr in attr.bh_named_children.items():
@@ -162,9 +171,6 @@ class ContextRule:
                 ),
             )
 
-        for name in _COLLECTION_NAMES:
-            if name not in ret:
-                ret[name] = []
         return ret
 
     async def callback_kwargs(self, attr, state):
@@ -336,55 +342,60 @@ class PipelineBase:
             raise RuntimeError('TODO: input state not valid')
 
     async def _invoke_callbacks(self):
+        COLLECTION_NAME_KEY = '_collection_name'
+
         name2selected = await async_call(
             self.context_rule.select_callbacks,
             self.resource, self.input_state,
         )
 
-        async_collection_names = []
-        async_nested_gathers = []
-        async_nested_paths = []
+        callback2options = {}
+        parallel_groups_of_callbacks_input = []
 
         for collection_name, callback_and_options in name2selected.items():
-            async_collection_names.append(collection_name)
+            for callback, options in callback_and_options:
+                # patch options.
+                options[COLLECTION_NAME_KEY] = collection_name
+                # keep mapping.
+                callback2options[callback] = options
 
-            async_gathers = []
-            async_paths = []
+                parallel_groups_of_callbacks_input.append(
+                    (callback, options),
+                )
 
-            for callback, attr, state in callback_and_options:
+        name2raw_obj = defaultdict(TreeState)
+
+        for callback_group in parallel_groups_of_callbacks(
+            parallel_groups_of_callbacks_input,
+        ):
+            names = []
+            paths = []
+            async_callbacks = []
+
+            for callback in callback_group:
+                options = callback2options[callback]
+
                 kwargs = await async_call(
                     self.context_rule.callback_kwargs,
-                    attr, state,
-                )
-                async_gathers.append(
-                    async_call(callback, **kwargs),
-                )
-                async_paths.append(
-                    attr.bh_path,
+                    **options,
                 )
 
-            async_nested_gathers.append(async_gathers)
-            async_nested_paths.append(async_paths)
+                names.append(options.get(COLLECTION_NAME_KEY))
+                paths.append(options.get('attr').bh_path)
 
-        joined_callbacks = asyncio.gather(
-            *[
-                asyncio.gather(*callbacks)
-                for callbacks in async_nested_gathers
-            ],
-        )
+                async_callbacks.append(async_call(callback, **kwargs))
 
-        name2raw_obj = {}
+            for name, path, ret in zip(
+                names, paths, await asyncio.gather(*async_callbacks),
+            ):
+                name2raw_obj[name].touch(path).value = ret
 
-        for name, paths, rets in zip(
-            async_collection_names,
-            async_nested_paths,
-            await joined_callbacks,
-        ):
-            tree_state = TreeState()
-            for path, ret in zip(paths, rets):
-                tree_state.touch(path).value = ret
-
+        for name, tree_state in name2raw_obj.items():
             name2raw_obj[name] = _merge_output_of_callbacks(tree_state)
+
+        for name in _COLLECTION_NAMES:
+            if name not in name2raw_obj:
+                name2raw_obj[name] = {}
 
         self.merged_output_of_callbacks = \
             RawOutputStateContainer(**name2raw_obj)

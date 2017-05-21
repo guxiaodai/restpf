@@ -79,18 +79,31 @@ class CallbackRegistrar:
             )
 
     def __call__(self, callback=None, **kwargs):
+        '''
+        Meaningful options:
+
+        - before_all: If is set, this callback will be executed before all
+        other callbacks. For a resource, at most one callback can be labeled as
+        before_all.
+        - run_after: Assign a callback that was registered. Then this callback
+        is guaranteed to be executed after that callback.
+        '''
+
         if callback:
             if callable(callback):
                 self.callback = callback
                 self.register()
+                return callback
             else:
                 raise RuntimeError('callback is not callable.')
+
         else:
             self.options = kwargs
 
             def _closure(callback):
                 self.callback = callback
                 self.register()
+                return callback
 
             return _closure
 
