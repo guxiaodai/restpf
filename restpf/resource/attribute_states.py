@@ -14,7 +14,7 @@ from .attributes import (
     AppearanceConfig,
     UnknowAttributeConfig,
 )
-from .behavior_tree import (
+from restpf.utils.behavior_tree import (
     BehaviorTreeNodeStateLeaf,
     BehaviorTreeNodeStateNested,
 )
@@ -56,10 +56,18 @@ def _check_on_none_value_case(state, attr_context):
     else:
         raise NotImplemented
 
+    this_node_is_not_required = \
+        attr_context.appear(state.bh_node) is not AppearanceConfig.REQUIRE
+
+    there_is_no_defined_child = (
+        isinstance(state, NestedAttributeState) and
+        state.bh_node.bh_children_size == 0
+    )
+
     if is_null:
         return (
             True,
-            attr_context.appear(state.bh_node) is not AppearanceConfig.REQUIRE
+            there_is_no_defined_child or this_node_is_not_required,
         )
     else:
         return (

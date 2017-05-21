@@ -1,11 +1,15 @@
+from tests.utils.attr_config import *
+
 from restpf.resource.attributes import (
     String,
     Object,
+    AttributeContextOperator,
     HTTPMethodConfig,
 )
 from restpf.resource.definition import (
     AttributeCollection,
     Attributes,
+    Relationships,
     Resource,
 )
 
@@ -100,3 +104,13 @@ def test_resource_definition():
     )
     assert rd.attributes.a.b.bar
     assert isinstance(rd.attributes_obj, Attributes)
+
+
+def test_validate_on_empty_relationships():
+    rel = Relationships()
+    context = AttributeContextOperator(HTTPMethodConfig.POST)
+    obj = create_attribute_state_tree_for_input(
+        rel.attr_obj,
+        {},
+    )
+    assert obj.validate(context)

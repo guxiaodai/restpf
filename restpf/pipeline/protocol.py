@@ -7,11 +7,16 @@ from collections import (
 
 from restpf.utils.helper_functions import (
     method_named_args,
+    async_call,
 )
 from restpf.utils.helper_classes import (
     TreeState,
 )
-from restpf.utils.helper_functions import async_call
+
+from restpf.resource.attribute_states import (
+    create_attribute_state_tree_for_input,
+    create_attribute_state_tree_for_output,
+)
 from restpf.resource.attributes import (
     AttributeContextOperator,
 )
@@ -177,21 +182,48 @@ class ContextRule:
         }
 
 
-class ContextRuleWithResourceID(ContextRule):
+class ContextRuleWithInputBinding(type):
 
-    @method_named_args('raw_resource_id')
-    def __init__(self):
-        pass
+    @classmethod
+    def _inject_methods(cls, attr2kwarg, resultcls):
 
-    async def callback_kwargs(self, attr, state):
-        ret = await async_call(
-            super().callback_kwargs,
-            attr, state,
-        )
-        ret.update({
-            'resource_id': self.raw_resource_id,
-        })
-        return ret
+        # build __init__.
+        @method_named_args(*attr2kwarg.keys())
+        def __init__(self):
+            pass
+
+        resultcls.__init__ = __init__
+
+        # build callback_kwargs.
+        async def callback_kwargs(self, attr, state):
+            ret = await async_call(
+                super(resultcls, self).callback_kwargs,
+                attr, state,
+            )
+            ret.update({
+                kwarg_name: getattr(self, attr_name)
+                for attr_name, kwarg_name in attr2kwarg.items()
+            })
+            return ret
+
+        resultcls.callback_kwargs = callback_kwargs
+
+    def __new__(cls, name, bases, namespace):
+        # get mapping: attr_name -> kwarg_name
+        attr2kwarg = namespace.get('INPUT_ATTR2KWARG')
+
+        # generate class first.
+        if attr2kwarg:
+            # inject base class.
+            bases = bases + (ContextRule,)
+
+        resultcls = type.__new__(cls, name, bases, namespace)
+
+        if attr2kwarg:
+            # only trigger when the INPUT_ATTR2KWARG is defined.
+            cls._inject_methods(attr2kwarg, resultcls)
+
+        return resultcls
 
 
 class _ContextRuleBinder:
@@ -202,6 +234,18 @@ class _ContextRuleBinder:
 
 
 class StateTreeBuilder(_ContextRuleBinder):
+
+    def _get_id_state_for_input(self, resource):
+        return create_attribute_state_tree_for_input(
+            resource.id_obj,
+            self.context_rule.raw_resource_id,
+        )
+
+    def _get_id_state_for_output(self, resource):
+        return create_attribute_state_tree_for_output(
+            resource.id_obj,
+            self.context_rule.raw_resource_id,
+        )
 
     async def build_input_state(self, resource):
         raise NotImplemented

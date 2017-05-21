@@ -2,11 +2,10 @@ from restpf.resource.attributes import (
     HTTPMethodConfig,
 )
 from restpf.resource.attribute_states import (
-    create_attribute_state_tree_for_input,
     create_attribute_state_tree_for_output,
 )
 from restpf.pipeline.protocol import (
-    ContextRuleWithResourceID,
+    ContextRuleWithInputBinding,
     StateTreeBuilder,
     RepresentationGenerator,
     ResourceState,
@@ -15,30 +14,23 @@ from restpf.pipeline.protocol import (
 )
 
 
-class GetSingleResourceContextRule(ContextRuleWithResourceID):
+class GetSingleResourceContextRule(metaclass=ContextRuleWithInputBinding):
 
     HTTPMethod = HTTPMethodConfig.GET
 
+    INPUT_ATTR2KWARG = {
+        'raw_resource_id': 'resource_id',
+    }
+
 
 class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
-
-    def _get_id_state(self, resource, is_input):
-        if is_input:
-            creator = create_attribute_state_tree_for_input
-        else:
-            creator = create_attribute_state_tree_for_output
-
-        return creator(
-            resource.id_obj,
-            self.context_rule.raw_resource_id,
-        )
 
     def build_input_state(self, resource):
         return ResourceState(
             attributes=None,
             relationships=None,
             # for id validation.
-            resource_id=self._get_id_state(resource, True),
+            resource_id=self._get_id_state_for_input(resource),
         )
 
     def build_output_state(self, resource, raw_obj):
