@@ -23,15 +23,15 @@ async def test_simple_get():
 
     @test.attributes.foo.GET
     def get_foo(resource_id):
-        return resource_id.value * 10
+        return resource_id * 10
 
     @test.attributes.bar.GET
     async def get_bar(resource_id):
-        return str(resource_id.value)
+        return str(resource_id)
 
     tp = GetSingleResourcePipelineRunner()
-    tp.build_context_rule()
-    tp.build_state_tree_builder(raw_resource_id=42)
+    tp.build_context_rule(raw_resource_id=42)
+    tp.build_state_tree_builder()
     tp.build_representation_generator()
     tp.set_resource(test)
 

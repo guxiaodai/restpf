@@ -3,7 +3,7 @@ import pytest
 from restpf.utils.helper_functions import (
     async_call,
     bind_self_with_options,
-    init_named_args,
+    method_named_args,
 )
 
 
@@ -61,11 +61,11 @@ def test_bind_self_with_options():
     assert 2 == t.bar
 
 
-def test_init_named_args():
+def test_method_named_args():
 
     class Test:
 
-        @init_named_args('foo', 'bar')
+        @method_named_args('foo', 'bar')
         def __init__(self, a, b=1):
             self.pack = (a, b)
 

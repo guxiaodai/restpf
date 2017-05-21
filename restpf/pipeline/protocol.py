@@ -6,7 +6,7 @@ from collections import (
 )
 
 from restpf.utils.helper_functions import (
-    init_named_args,
+    method_named_args,
 )
 from restpf.utils.helper_classes import (
     TreeState,
@@ -162,7 +162,7 @@ class ContextRule:
                 ret[name] = []
         return ret
 
-    async def callback_kwargs(self, attr, state, root_input_state):
+    async def callback_kwargs(self, attr, state):
         '''
         TODO
         Available keys:
@@ -174,11 +174,34 @@ class ContextRule:
         return {
             'attr': attr,
             'state': state,
-            'resource_id': root_input_state.resource_id,
         }
 
 
-class StateTreeBuilder:
+class ContextRuleWithResourceID(ContextRule):
+
+    @method_named_args('raw_resource_id')
+    def __init__(self):
+        pass
+
+    async def callback_kwargs(self, attr, state):
+        ret = await async_call(
+            super().callback_kwargs,
+            attr, state,
+        )
+        ret.update({
+            'resource_id': self.raw_resource_id,
+        })
+        return ret
+
+
+class _ContextRuleBinder:
+
+    @method_named_args('context_rule')
+    def bind_context_rule(self):
+        pass
+
+
+class StateTreeBuilder(_ContextRuleBinder):
 
     async def build_input_state(self, resource):
         raise NotImplemented
@@ -187,7 +210,7 @@ class StateTreeBuilder:
         raise NotImplemented
 
 
-class RepresentationGenerator:
+class RepresentationGenerator(_ContextRuleBinder):
 
     async def generate_representation(self, resource, output_state):
         return {}
@@ -238,12 +261,22 @@ class PipelineBase:
     6. validate `output_state`.
     '''
 
-    @init_named_args(
+    @method_named_args(
         'resource', 'context_rule',
         'state_builder', 'rep_generator',
     )
     def __init__(self):
-        pass
+        '''
+        1. `context_rule` holds all the states of input.
+        2. other entities all reference `context_rule`.
+        '''
+
+        self.state_builder.bind_context_rule(
+            context_rule=self.context_rule,
+        )
+        self.rep_generator.bind_context_rule(
+            context_rule=self.context_rule,
+        )
 
     async def _build_input_state(self):
         self.input_state = await async_call(
@@ -277,7 +310,7 @@ class PipelineBase:
             for callback, attr, state in callback_and_options:
                 kwargs = await async_call(
                     self.context_rule.callback_kwargs,
-                    attr, state, self.input_state,
+                    attr, state,
                 )
                 async_gathers.append(
                     async_call(callback, **kwargs),

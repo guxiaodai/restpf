@@ -57,7 +57,7 @@ def bind_self_with_options(names, self, options):
         setattr(self, name, options.get(name))
 
 
-def init_named_args(*names):
+def method_named_args(*names):
 
     def _decorator(init):
 

@@ -1,6 +1,3 @@
-from restpf.utils.helper_functions import (
-    init_named_args,
-)
 from restpf.resource.attributes import (
     HTTPMethodConfig,
 )
@@ -9,7 +6,7 @@ from restpf.resource.attribute_states import (
     create_attribute_state_tree_for_output,
 )
 from restpf.pipeline.protocol import (
-    ContextRule,
+    ContextRuleWithResourceID,
     StateTreeBuilder,
     RepresentationGenerator,
     ResourceState,
@@ -18,16 +15,12 @@ from restpf.pipeline.protocol import (
 )
 
 
-class GetSingleResourceContextRule(ContextRule):
+class GetSingleResourceContextRule(ContextRuleWithResourceID):
 
     HTTPMethod = HTTPMethodConfig.GET
 
 
 class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
-
-    @init_named_args('raw_resource_id')
-    def __init__(self):
-        pass
 
     def _get_id_state(self, resource, is_input):
         if is_input:
@@ -35,12 +28,16 @@ class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
         else:
             creator = create_attribute_state_tree_for_output
 
-        return creator(resource.id_obj, self.raw_resource_id)
+        return creator(
+            resource.id_obj,
+            self.context_rule.raw_resource_id,
+        )
 
     def build_input_state(self, resource):
         return ResourceState(
             attributes=None,
             relationships=None,
+            # for id validation.
             resource_id=self._get_id_state(resource, True),
         )
 
@@ -54,7 +51,8 @@ class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
                 resource.relationships_obj.attr_obj,
                 raw_obj.relationships,
             ),
-            resource_id=self._get_id_state(resource, False),
+            # no need to validate.
+            resource_id=None,
         )
 
 
@@ -62,7 +60,7 @@ class GetSingleResourceRepresentationGenerator(RepresentationGenerator):
 
     def generate_representation(self, resource, output_state):
         return {
-            'id': output_state.resource_id.value,
+            'id': self.context_rule.raw_resource_id,
             'type': resource.name,
             'attributes': output_state.attributes.serialize(),
             'relationships': output_state.relationships.serialize(),
