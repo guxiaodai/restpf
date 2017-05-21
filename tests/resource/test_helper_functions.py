@@ -1,9 +1,11 @@
 import pytest
 
+from restpf.utils.constants import CallbackRegistrarOptions
 from restpf.utils.helper_functions import (
     async_call,
     bind_self_with_options,
     method_named_args,
+    parallel_groups_of_callbacks,
 )
 
 
@@ -73,3 +75,74 @@ def test_method_named_args():
     assert 1 == t.foo
     assert 2 == t.bar
     assert (3, 4) == t.pack
+
+
+def testparallel_groups_of_callbacks():
+
+    def a():
+        pass
+
+    async def b():
+        pass
+
+    def c():
+        pass
+
+    def d():
+        pass
+
+    # with root.
+    groups = parallel_groups_of_callbacks([
+        (a, {CallbackRegistrarOptions.BEFORE_ALL: True}),
+        (b, {}),
+        (c, {}),
+        (d, {}),
+    ])
+    assert 2 == len(groups)
+    assert set([a]) == set(groups[0])
+    assert set([b, c, d]) == set(groups[1])
+
+    # without root.
+    groups = parallel_groups_of_callbacks([
+        (a, {}),
+        (b, {}),
+        (c, {}),
+        (d, {}),
+    ])
+    assert 1 == len(groups)
+    assert set([a, b, c, d]) == set(groups[0])
+
+    # chaining.
+    groups = parallel_groups_of_callbacks([
+        (a, {}),
+        (b, {CallbackRegistrarOptions.RUN_AFTER: a}),
+        (c, {CallbackRegistrarOptions.RUN_AFTER: b}),
+        (d, {}),
+    ])
+    assert 3 == len(groups)
+    assert set([a, d]) == set(groups[0])
+    assert set([b]) == set(groups[1])
+    assert set([c]) == set(groups[2])
+
+    # multiple RUN_AFTER.
+    groups = parallel_groups_of_callbacks([
+        (a, {}),
+        (b, {}),
+        (c, {CallbackRegistrarOptions.RUN_AFTER: [a, b]}),
+        (d, {}),
+    ])
+    assert 2 == len(groups)
+    assert set([a, b, d]) == set(groups[0])
+    assert set([c]) == set(groups[1])
+
+    # indirect dependency.
+    groups = parallel_groups_of_callbacks([
+        (a, {}),
+        (b, {}),
+        (c, {CallbackRegistrarOptions.RUN_AFTER: b}),
+        (d, {CallbackRegistrarOptions.RUN_AFTER: [a, b, c]}),
+    ])
+    assert 3 == len(groups)
+    assert set([a, b]) == set(groups[0])
+    assert set([c]) == set(groups[1])
+    assert set([d]) == set(groups[2])
