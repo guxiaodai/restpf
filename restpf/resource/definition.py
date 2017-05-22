@@ -23,6 +23,7 @@ import inspect
 
 from restpf.utils.constants import (
     HTTPMethodConfig,
+    CallbackRegistrarOptions,
 )
 from restpf.utils.helper_classes import (
     TreeState,
@@ -141,6 +142,23 @@ class CallbackInformation:
         )
 
 
+class SpecialHooksCallbackInformation(CallbackInformation):
+
+    def _set_callback_and_options(self, path, context, callback, options):
+        if not path:
+            raise RuntimeError('must attach to special_hooks member.')
+
+        options = options or {}
+        for item in [
+            CallbackRegistrarOptions.BEFORE_ALL,
+            CallbackRegistrarOptions.AFTER_ALL,
+        ]:
+            if path[0] == item.value:
+                options[item.value] = True
+
+        super()._set_callback_and_options(path, context, callback, options)
+
+
 class AttributeCollection:
 
     COLLECTION_NAME = None
@@ -233,7 +251,15 @@ class SpecialHooks(AttributeCollection):
 
     COLLECTION_NAME = 'special_hooks'
 
+    def __init__(self):
+        super().__init__({
+            CallbackRegistrarOptions.BEFORE_ALL.value: Integer,
+            CallbackRegistrarOptions.AFTER_ALL.value: Integer,
+        })
+        self._callback_info = SpecialHooksCallbackInformation(self._attr_obj)
 
+
+# TODO: refactor class attribute definitions.
 class Resource:
 
     def __init__(self,
@@ -250,7 +276,7 @@ class Resource:
         )
         self._attributes = attributes
         self._relationships = relationships or Relationships()
-        self._special_hooks = self._generate_special_hooks()
+        self._special_hooks = SpecialHooks()
 
     def _generate_id_obj(self, id_attr, id_appear_in_post):
         if id_attr not in (Integer, String) and \
@@ -266,12 +292,6 @@ class Resource:
             )
         else:
             return id_attr
-
-    def _generate_special_hooks(self):
-        return SpecialHooks({
-            'before_all': Integer,
-            'after_all': Integer,
-        })
 
     @property
     def attributes_obj(self):

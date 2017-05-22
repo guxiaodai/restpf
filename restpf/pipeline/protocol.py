@@ -150,7 +150,7 @@ class ContextRule:
         '''
 
         ret = {}
-        for key in ['attributes', 'relationships']:
+        for key in ['special_hooks', 'attributes', 'relationships']:
             if getattr(resource, key) is None:
                 continue
 
@@ -161,14 +161,8 @@ class ContextRule:
                     attr_collection,
                     'get_registered_callback_and_options',
                 ),
-                getattr(
-                    attr_collection,
-                    'attr_obj',
-                ),
-                getattr(
-                    state,
-                    key,
-                ),
+                getattr(attr_collection, 'attr_obj'),
+                getattr(state, key, None),
             )
 
         return ret
@@ -388,6 +382,10 @@ class PipelineBase:
             for name, path, ret in zip(
                 names, paths, await asyncio.gather(*async_callbacks),
             ):
+                if name == 'special_hooks':
+                    # do not capture the return of special_hooks.
+                    continue
+
                 name2raw_obj[name].touch(path).value = ret
 
         for name, tree_state in name2raw_obj.items():
