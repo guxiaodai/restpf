@@ -81,6 +81,30 @@ def method_named_args(*names):
     return _decorator
 
 
+def property_with_cache(accessor):
+
+    CACHE_KEY = f'__cache_for_{accessor.__name__}'
+
+    @wraps(accessor)
+    def _wrapper(self):
+        sp = super(type(self), self)
+
+        # load from cache.
+        try:
+            _cache = sp.__getattribute__(CACHE_KEY)
+        except AttributeError:
+            _cache = None
+
+        # set cache for first time.
+        if _cache is None:
+            _cache = accessor(self)
+            sp.__setattr__(CACHE_KEY, _cache)
+
+        return _cache
+
+    return property(_wrapper)
+
+
 # restricted options only contains CallbackRegistrarOptions.
 def parallel_groups_of_callbacks(callback_and_restricted_options):
     root = None

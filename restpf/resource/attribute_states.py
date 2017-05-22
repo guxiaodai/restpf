@@ -18,6 +18,7 @@ from restpf.utils.behavior_tree import (
     BehaviorTreeNodeStateLeaf,
     BehaviorTreeNodeStateNested,
 )
+from restpf.utils.helper_functions import property_with_cache
 
 
 def create_attribute_state_tree(node, value, node2statecls):
@@ -379,6 +380,10 @@ class ArrayStateForInputDefault(ArrayStateCommon):
     def serialize(self):
         return None
 
+    @property_with_cache
+    def value(self):
+        return list(child.value for child in self)
+
 
 class TupleStateConfig:
     BH_NODECLS = Tuple
@@ -450,6 +455,10 @@ class TupleStateForInputDefault(TupleStateCommon, ArrayStateForInputDefault):
 
     def serialize(self):
         return None
+
+    @property_with_cache
+    def value(self):
+        return tuple(child.value for child in self)
 
 
 class ObjectStateConfig:
@@ -561,6 +570,13 @@ class ObjectStateForInputDefault(ObjectStateCommon):
 
     def serialize(self):
         return None
+
+    @property_with_cache
+    def value(self):
+        return {
+            name: child.value
+            for name, child in self.bh_named_children.items()
+        }
 
 
 def node2statecls_generator(*state_clses):
