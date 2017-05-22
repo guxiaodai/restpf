@@ -89,13 +89,11 @@ def property_with_cache(accessor):
     def _wrapper(self):
         sp = super(type(self), self)
 
-        # load from cache.
         try:
             _cache = sp.__getattribute__(CACHE_KEY)
         except AttributeError:
             _cache = None
 
-        # set cache for first time.
         if _cache is None:
             _cache = accessor(self)
             sp.__setattr__(CACHE_KEY, _cache)
