@@ -177,6 +177,14 @@ def test_tuple_input():
     assert_validate_input(attr, (1.0, 'test'))
 
 
+def test_tuple_input_value():
+    attr = Tuple(Float, String)
+
+    v = (1.0, 'test')
+    state = gen_test_state_for_input(attr, v)
+    assert v == state.value
+
+
 def test_tuple_abbr_serialization():
     attr = Tuple(Integer, Integer, Integer)
 
@@ -328,6 +336,22 @@ def test_array_iterable():
         assert obj.value == value
 
 
+def test_array_input_value():
+    attr = Array(Integer)
+    v = [1, 2, 3]
+    state = gen_test_state_for_input(attr, v)
+    assert v == state.value
+
+    attr = Array(Object({'foo': Integer, 'bar': Bool}))
+    v = [
+        {'foo': 2, 'bar': False},
+        {'foo': 1, 'bar': True},
+        {'foo': 3, 'bar': True},
+    ]
+    state = gen_test_state_for_input(attr, v)
+    assert v == state.value
+
+
 def test_object_getattr():
     attr = Object({
         'foo': Integer,
@@ -346,6 +370,14 @@ def test_object_getattr():
 
     with pytest.raises(AssertionError):
         state.whatever
+
+
+def test_object_input_value():
+    attr = Object({'foo': Integer, 'bar': Bool})
+    v = {'foo': 3, 'bar': True}
+    state = gen_test_state_for_input(attr, v)
+    assert v == state.value
+    assert id(state.value) == id(state.value)
 
 
 def test_object_path():

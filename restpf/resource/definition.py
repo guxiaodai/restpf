@@ -23,6 +23,7 @@ import inspect
 
 from restpf.utils.constants import (
     HTTPMethodConfig,
+    CallbackRegistrarOptions,
 )
 from restpf.utils.helper_classes import (
     TreeState,
@@ -79,18 +80,32 @@ class CallbackRegistrar:
             )
 
     def __call__(self, callback=None, **kwargs):
+        '''
+        Meaningful options:
+
+        - before_all: If is set, this callback(s) will be executed before all
+        other callbacks. For a resource, at most one callback can be labeled as
+        before_all.
+        - run_after: Assign a callback that was registered. Then this callback
+        is guaranteed to be executed after that callback.
+        - after_all: Similar to before_all, but for the last execution.
+        '''
+
         if callback:
             if callable(callback):
                 self.callback = callback
                 self.register()
+                return callback
             else:
                 raise RuntimeError('callback is not callable.')
+
         else:
             self.options = kwargs
 
             def _closure(callback):
                 self.callback = callback
                 self.register()
+                return callback
 
             return _closure
 
@@ -125,6 +140,23 @@ class CallbackInformation:
             callback_registrar.callback,
             callback_registrar.options,
         )
+
+
+class SpecialHooksCallbackInformation(CallbackInformation):
+
+    def _set_callback_and_options(self, path, context, callback, options):
+        if not path:
+            raise RuntimeError('must attach to special_hooks member.')
+
+        options = options or {}
+        for item in [
+            CallbackRegistrarOptions.BEFORE_ALL,
+            CallbackRegistrarOptions.AFTER_ALL,
+        ]:
+            if path[0] == item.value:
+                options[item.value] = True
+
+        super()._set_callback_and_options(path, context, callback, options)
 
 
 class AttributeCollection:
@@ -215,6 +247,19 @@ class Relationships(AttributeCollection):
         return True
 
 
+class SpecialHooks(AttributeCollection):
+
+    COLLECTION_NAME = 'special_hooks'
+
+    def __init__(self):
+        super().__init__({
+            CallbackRegistrarOptions.BEFORE_ALL.value: Integer,
+            CallbackRegistrarOptions.AFTER_ALL.value: Integer,
+        })
+        self._callback_info = SpecialHooksCallbackInformation(self._attr_obj)
+
+
+# TODO: refactor class attribute definitions.
 class Resource:
 
     def __init__(self,
@@ -231,6 +276,7 @@ class Resource:
         )
         self._attributes = attributes
         self._relationships = relationships or Relationships()
+        self._special_hooks = SpecialHooks()
 
     def _generate_id_obj(self, id_attr, id_appear_in_post):
         if id_attr not in (Integer, String) and \
@@ -255,8 +301,12 @@ class Resource:
     def relationships_obj(self):
         return self._relationships
 
+    @property
+    def special_hooks_obj(self):
+        return self._special_hooks
+
     def __getattribute__(self, name):
-        if name in ('attributes', 'relationships'):
+        if name in ('attributes', 'relationships', 'special_hooks'):
             # for callback registrater.
             obj = super().__getattribute__(f'_{name}')
             return obj.create_callback_registrar()

@@ -31,7 +31,7 @@ async def test_simple_post():
 
     called = []
 
-    @test.attributes.a.POST
+    @test.attributes.a.POST(before_all=True)
     def a(resource_id, state):
         called.append('a')
 
@@ -68,4 +68,4 @@ async def test_simple_post():
 
     await tp.run_pipeline()
     # no order required.
-    assert set(['a', 'c']) == set(called)
+    assert ['a', 'c'] == called

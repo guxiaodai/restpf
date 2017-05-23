@@ -151,12 +151,26 @@ async def test_pipeline():
         None,
     )
 
+    called = []
+
+    @resource.special_hooks.before_all.POST
+    def run_before_all(callback_kwargs):
+        called.append(1)
+        callback_kwargs.register('whatever', 42)
+
+    @resource.special_hooks.after_all.POST
+    def run_after_all(whatever):
+        called.append(4)
+        assert 42 == whatever
+
     @resource.attributes.foo.POST
     def process_foo(state):
+        called.append(2)
         return state.value + 10
 
     @resource.attributes.bar.POST
     def process_bar(state):
+        called.append(3)
         return state.value + ' suffix'
 
     class TestPipelineRunner(PipelineRunner):
@@ -173,6 +187,10 @@ async def test_pipeline():
     tp.set_resource(resource)
 
     pipeline = await tp.run_pipeline()
+
+    assert 4 == len(called)
+    assert 1 == called[0]
+    assert 4 == called[-1]
 
     expected = {
         'id': {
