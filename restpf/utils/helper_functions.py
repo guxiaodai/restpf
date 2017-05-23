@@ -1,12 +1,26 @@
 import inspect
+
 import collections.abc as abc
-from collections import defaultdict, deque
+from collections import (
+    defaultdict,
+    deque,
+    namedtuple,
+)
+
 from functools import wraps
 
 from restpf.utils.constants import (
     CallbackRegistrarOptions,
     TopologySearchColor,
 )
+
+
+def namedtuple_with_default(name, *pairs):
+    keys, defaults = zip(*pairs)
+
+    gencls = namedtuple(name, keys)
+    gencls.__new__.__defaults__ = tuple(defaults)
+    return gencls
 
 
 def to_iterable(element):

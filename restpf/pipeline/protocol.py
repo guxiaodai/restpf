@@ -2,7 +2,6 @@ import asyncio
 from functools import wraps
 from collections import (
     deque,
-    namedtuple,
     defaultdict,
 )
 
@@ -23,19 +22,14 @@ from restpf.resource.attributes import (
     AttributeContextOperator,
 )
 
-
-# `state`, `input_state`, `output_state` should be instance of ResourceState.
-_COLLECTION_NAMES = ['attributes', 'relationships', 'resource_id']
-
-ResourceState = namedtuple(
-    'ResourceState',
-    _COLLECTION_NAMES,
+from .states import (
+    CallbackKwargsRegistrar,
+    RawOutputStateContainer,
 )
 
-RawOutputStateContainer = namedtuple(
-    'RawOutputStateContainer',
-    _COLLECTION_NAMES,
-)
+
+# only for interface.
+from .states import ResourceState  # noqa
 
 
 def _meta_build(method):
@@ -85,27 +79,6 @@ class PipelineRunner:
         )
         await pipeline.run()
         return pipeline
-
-
-class CallbackKwargsRegistrar:
-
-    def __init__(self):
-        self._registered_kwargs = {}
-
-    def register(self, name, value):
-        assert name.isidentifier()
-        self._registered_kwargs[name] = value
-
-    def callback_kwargs(self, attr, state):
-        ret = {
-            # for callback kwargs registration.
-            'callback_kwargs': self,
-
-            'attr': attr,
-            'state': state,
-        }
-        ret.update(self._registered_kwargs)
-        return ret
 
 
 class ContextRule:
@@ -394,10 +367,6 @@ class PipelineBase:
 
         for name, tree_state in name2raw_obj.items():
             name2raw_obj[name] = _merge_output_of_callbacks(tree_state)
-
-        for name in _COLLECTION_NAMES:
-            if name not in name2raw_obj:
-                name2raw_obj[name] = {}
 
         self.merged_output_of_callbacks = \
             RawOutputStateContainer(**name2raw_obj)
