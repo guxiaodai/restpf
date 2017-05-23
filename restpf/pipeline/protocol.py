@@ -87,9 +87,33 @@ class PipelineRunner:
         return pipeline
 
 
+class CallbackKwargsRegistrar:
+
+    def __init__(self):
+        self._registered_kwargs = {}
+
+    def register(self, name, value):
+        assert name.isidentifier()
+        self._registered_kwargs[name] = value
+
+    def callback_kwargs(self, attr, state):
+        ret = {
+            # for callback kwargs registration.
+            'callback_kwargs': self,
+
+            'attr': attr,
+            'state': state,
+        }
+        ret.update(self._registered_kwargs)
+        return ret
+
+
 class ContextRule:
 
     HTTPMethod = None
+
+    def __init__(self):
+        self._callback_kwargs_registrar = CallbackKwargsRegistrar()
 
     def _default_validator(self, state):
         context = AttributeContextOperator(self.HTTPMethod)
@@ -168,18 +192,7 @@ class ContextRule:
         return ret
 
     async def callback_kwargs(self, attr, state):
-        '''
-        TODO
-        Available keys:
-
-        - state
-        - attr
-        - resource_id
-        '''
-        return {
-            'attr': attr,
-            'state': state,
-        }
+        return self._callback_kwargs_registrar.callback_kwargs(attr, state)
 
 
 class ContextRuleWithInputBinding(type):
@@ -190,23 +203,14 @@ class ContextRuleWithInputBinding(type):
         # build __init__.
         @method_named_args(*attr2kwarg.keys())
         def __init__(self):
-            pass
+            super(type(self), self).__init__()
+            # register kwargs.
+            for attr_name, kwarg_name in attr2kwarg.items():
+                self._callback_kwargs_registrar.register(
+                    kwarg_name, getattr(self, attr_name),
+                )
 
         resultcls.__init__ = __init__
-
-        # build callback_kwargs.
-        async def callback_kwargs(self, attr, state):
-            ret = await async_call(
-                super(resultcls, self).callback_kwargs,
-                attr, state,
-            )
-            ret.update({
-                kwarg_name: getattr(self, attr_name)
-                for attr_name, kwarg_name in attr2kwarg.items()
-            })
-            return ret
-
-        resultcls.callback_kwargs = callback_kwargs
 
     def __new__(cls, name, bases, namespace):
         # get mapping: attr_name -> kwarg_name
