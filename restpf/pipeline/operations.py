@@ -12,6 +12,7 @@ from restpf.resource.attribute_states import (
 )
 
 from .states import (
+    CallbackKwargsProcessor,
     CallbackKwargsRegistrar,
 )
 
@@ -21,7 +22,12 @@ class ContextRule:
     HTTPMethod = None
 
     def __init__(self):
+        self._callback_kwargs_processor = CallbackKwargsProcessor()
         self._callback_kwargs_registrar = CallbackKwargsRegistrar()
+
+        self._callback_kwargs_processor.add_controller(
+            self._callback_kwargs_registrar,
+        )
 
     def _default_validator(self, state):
         context = AttributeContextOperator(self.HTTPMethod)
@@ -100,7 +106,7 @@ class ContextRule:
         return ret
 
     async def callback_kwargs(self, attr, state):
-        return self._callback_kwargs_registrar.callback_kwargs(attr, state)
+        return self._callback_kwargs_processor.callback_kwargs(attr, state)
 
 
 class ContextRuleWithInputBinding(type):

@@ -11,6 +11,7 @@ from restpf.utils.helper_classes import TreeState
 
 from .states import ResourceState                   # noqa
 from .states import RawOutputStateContainer         # noqa
+
 from .operations import ContextRuleWithInputBinding # noqa
 from .operations import ContextRule                 # noqa
 from .operations import StateTreeBuilder            # noqa
