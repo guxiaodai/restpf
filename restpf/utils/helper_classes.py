@@ -132,3 +132,46 @@ class TreeState:
         self._obj[self._VALUE] = value
 
     value = property(_value_get, _value_set)
+
+
+class ProxyStateOperator:
+
+    PROXY_ATTRS = set([])
+
+    def _cache_hierarchy_proxy_attrs(self):
+        ret = set()
+        for _cls in type(self).__mro__:
+            PROXY_ATTRS = getattr(_cls, 'PROXY_ATTRS', None)
+            if PROXY_ATTRS is None:
+                break
+            ret.update(PROXY_ATTRS)
+        return ret
+
+    def bind_proxy_state(self, state):
+        # cache PROXY_ATTRS.
+        self.PROXY_ATTRS = self._cache_hierarchy_proxy_attrs()
+        # bind state.
+        self._pso_proxy_state = state
+
+    def __getattribute__(self, name):
+        use_default = False
+        try:
+            PROXY_ATTRS = object.__getattribute__(
+                self, 'PROXY_ATTRS',
+            )
+            _pso_proxy_state = object.__getattribute__(
+                self, '_pso_proxy_state',
+            )
+        except AttributeError:
+            use_default = True
+
+        if use_default or name not in PROXY_ATTRS:
+            return object.__getattribute__(self, name)
+        else:
+            return getattr(_pso_proxy_state, name, None)
+
+    def __setattr__(self, name, value):
+        if name in self.PROXY_ATTRS:
+            setattr(self._pso_proxy_state, name, value)
+        else:
+            object.__setattr__(self, name, value)
