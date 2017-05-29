@@ -1,6 +1,7 @@
 import collections.abc as abc
 import operator
 import copy
+import inspect
 
 from .helper_functions import method_named_args
 
@@ -158,6 +159,8 @@ class ProxyStateOperator:
                     default = None
                 elif isinstance(attr, abc.Sequence) and len(attr) == 2:
                     name, default = attr
+                    if inspect.isclass(default):
+                        default = default()
                 else:
                     raise RuntimeError("wrong format of PROXY_ATTRS.")
 

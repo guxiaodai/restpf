@@ -10,6 +10,7 @@ from restpf.resource.attribute_states import (
 from restpf.pipeline.protocol import (
     ContextRule,
     CallbackKwargsStateVariableMapper,
+    CallbackKwargsVariableCollector,
     StateTreeBuilder,
     RepresentationGenerator,
     ResourceState,
@@ -31,10 +32,18 @@ class PostSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper,
 ):
     ATTR2KWARG = {
-        'raw_resource_id': 'resource_id',
+        'raw_resource_id': 'submitted_resource_id',
         'raw_attributes': 'raw_attributes',
         'raw_relationships': 'raw_relationships',
     }
+
+
+class PostSingleResourceCallbackKwargsVariableCollector(
+    CallbackKwargsVariableCollector,
+):
+    VARIABLES = [
+        'generated_resource_id',
+    ]
 
 
 class PostSingleResourceContextRule(ContextRule):
@@ -81,6 +90,7 @@ class PostSingleResourcePipelineRunner(PipelineRunner):
 
     CALLBACK_KWARGS_CONTROLLER_CLSES = [
         PostSingleResourceCallbackKwargsStateVariableMapper,
+        PostSingleResourceCallbackKwargsVariableCollector,
     ]
     CONTEXT_RULE_CLS = PostSingleResourceContextRule
 

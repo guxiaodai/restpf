@@ -72,10 +72,11 @@ def test_proxy_state_operator():
 
         PROXY_ATTRS = [
             ('foo', 42),
-            'bar',
+            ('bar', dict),
         ]
 
     state = types.SimpleNamespace()
     t = TestDefault()
     t.bind_proxy_state(state)
     assert 42 == state.foo
+    assert {} == state.bar
