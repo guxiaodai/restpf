@@ -18,24 +18,28 @@ from restpf.pipeline.protocol import (
 )
 
 
-class PostSingleResourceContextRule(ContextRule):
+class PostSingleResourcePipelineState(metaclass=StateCreator):
 
-    HTTPMethod = HTTPMethodConfig.POST
+    ATTRS = [
+        'raw_resource_id',
+        'raw_attributes',
+        'raw_relationships',
+    ]
 
 
 class PostSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper,
 ):
-    PROXY_ATTRS = [
-        'raw_resource_id',
-        'raw_attributes',
-        'raw_relationships',
-    ]
     ATTR2KWARG = {
         'raw_resource_id': 'resource_id',
         'raw_attributes': 'raw_attributes',
         'raw_relationships': 'raw_relationships',
     }
+
+
+class PostSingleResourceContextRule(ContextRule):
+
+    HTTPMethod = HTTPMethodConfig.POST
 
 
 class PostSingleResourceStateTreeBuilder(StateTreeBuilder):
@@ -71,15 +75,6 @@ class PostSingleResourceRepresentationGenerator(RepresentationGenerator):
     def generate_representation(self, resource, output_state):
         # no return.
         return None
-
-
-class PostSingleResourcePipelineState(metaclass=StateCreator):
-
-    ATTRS = [
-        'raw_resource_id',
-        'raw_attributes',
-        'raw_relationships',
-    ]
 
 
 class PostSingleResourcePipelineRunner(PipelineRunner):

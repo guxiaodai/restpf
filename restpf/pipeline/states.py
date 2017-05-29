@@ -61,8 +61,11 @@ class CallbackKwargsRegistrar:
 
 class CallbackKwargsStateVariableMapper(ProxyStateOperator):
 
-    PROXY_ATTRS = []
     ATTR2KWARG = {}
+
+    @classmethod
+    def _get_proxy_attrs(cls):
+        return cls.ATTR2KWARG.keys()
 
     def update(self, ret):
         for name in self.PROXY_ATTRS:

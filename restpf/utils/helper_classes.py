@@ -140,15 +140,19 @@ class ProxyStateOperator:
 
     PROXY_ATTRS = []
 
+    @classmethod
+    def _get_proxy_attrs(cls):
+        return cls.PROXY_ATTRS
+
     def _cache_hierarchy_proxy_attrs(self):
         ret = {}
 
         for _cls in type(self).__mro__:
-            PROXY_ATTRS = getattr(_cls, 'PROXY_ATTRS', None)
-            if PROXY_ATTRS is None:
+            proxy_attrs_accessor = getattr(_cls, '_get_proxy_attrs', None)
+            if proxy_attrs_accessor is None:
                 continue
 
-            for attr in PROXY_ATTRS:
+            for attr in proxy_attrs_accessor():
                 if isinstance(attr, str):
                     name = attr
                     default = None
