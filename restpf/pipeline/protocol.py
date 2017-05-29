@@ -16,6 +16,7 @@ from .states import ResourceState                      # noqa
 from .states import RawOutputStateContainer            # noqa
 from .states import DefaultPipelineState               # noqa
 from .states import CallbackKwargsStateVariableMapper  # noqa
+from .states import CallbackKwargsVariableCollector    # noqa
 
 from .operations import ContextRule                    # noqa
 from .operations import StateTreeBuilder               # noqa

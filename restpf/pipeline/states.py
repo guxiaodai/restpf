@@ -61,13 +61,55 @@ class CallbackKwargsRegistrar:
 
 class CallbackKwargsStateVariableMapper(ProxyStateOperator):
 
-    PROXY_ATTRS = []
     ATTR2KWARG = {}
+
+    @classmethod
+    def _get_proxy_attrs(cls):
+        return cls.ATTR2KWARG.keys()
 
     def update(self, ret):
         for name in self.PROXY_ATTRS:
             kwarg_name = self.ATTR2KWARG[name]
             ret[kwarg_name] = getattr(self, name)
+
+
+class _CallbackKwargsVariableCollectorPropertyGenerator(type):
+
+    def __new__(cls, name, bases, namespace):
+        resultcls = type.__new__(cls, name, bases, namespace)
+
+        # generate properties.
+        attach_name = resultcls.ATTACH_TO[0]
+        for var in resultcls.VARIABLES:
+
+            # accessor and mutator.
+            def _getter(self):
+                return getattr(self, attach_name).get(var)
+
+            def _setter(self, value):
+                getattr(self, attach_name)[var] = value
+
+            setattr(resultcls, var, property(_getter, _setter))
+
+        return resultcls
+
+
+class CallbackKwargsVariableCollector(
+    ProxyStateOperator,
+    metaclass=_CallbackKwargsVariableCollectorPropertyGenerator,
+):
+    ATTACH_TO = ('var_collector', dict)
+    VARIABLES = []
+
+    @classmethod
+    def _get_proxy_attrs(cls):
+        return (cls.ATTACH_TO,)
+
+    def update(self, ret):
+        # bind registrar.
+        ret['var_collector'] = self
+        # bind registered variables.
+        ret.update(self.var_collector)
 
 
 class DefaultPipelineState(metaclass=StateCreator):

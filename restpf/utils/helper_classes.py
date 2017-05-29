@@ -1,6 +1,7 @@
 import collections.abc as abc
 import operator
 import copy
+import inspect
 
 from .helper_functions import method_named_args
 
@@ -140,20 +141,26 @@ class ProxyStateOperator:
 
     PROXY_ATTRS = []
 
+    @classmethod
+    def _get_proxy_attrs(cls):
+        return cls.PROXY_ATTRS
+
     def _cache_hierarchy_proxy_attrs(self):
         ret = {}
 
         for _cls in type(self).__mro__:
-            PROXY_ATTRS = getattr(_cls, 'PROXY_ATTRS', None)
-            if PROXY_ATTRS is None:
+            proxy_attrs_accessor = getattr(_cls, '_get_proxy_attrs', None)
+            if proxy_attrs_accessor is None:
                 continue
 
-            for attr in PROXY_ATTRS:
+            for attr in proxy_attrs_accessor():
                 if isinstance(attr, str):
                     name = attr
                     default = None
                 elif isinstance(attr, abc.Sequence) and len(attr) == 2:
                     name, default = attr
+                    if inspect.isclass(default):
+                        default = default()
                 else:
                     raise RuntimeError("wrong format of PROXY_ATTRS.")
 
@@ -200,9 +207,9 @@ class StateCreator(type):
 
     # return a simple namespace with parameters of __init__ defined in ATTRS.
     def __new__(cls, name, bases, namespace):
-        resultcls = type.__new__(cls, name, (), namespace)
+        resultcls = type.__new__(cls, name, bases, namespace)
 
-        @method_named_args(*namespace.get('ATTRS'))
+        @method_named_args(*getattr(resultcls, 'ATTRS'))
         def __init__(self):
             pass
 

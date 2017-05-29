@@ -9,7 +9,6 @@ from restpf.resource.attribute_states import (
 )
 
 from restpf.pipeline.protocol import (
-    # ContextRuleWithInputBinding,
     ContextRule,
     CallbackKwargsStateVariableMapper,
     StateTreeBuilder,
@@ -20,12 +19,16 @@ from restpf.pipeline.protocol import (
 )
 
 
+class GetSingleResourcePipelineState(metaclass=StateCreator):
+
+    ATTRS = [
+        'raw_resource_id',
+    ]
+
+
 class GetSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper
 ):
-    PROXY_ATTRS = [
-        'raw_resource_id',
-    ]
     ATTR2KWARG = {
         'raw_resource_id': 'resource_id',
     }
@@ -70,13 +73,6 @@ class GetSingleResourceRepresentationGenerator(RepresentationGenerator):
             'attributes': output_state.attributes.serialize(),
             'relationships': output_state.relationships.serialize(),
         }
-
-
-class GetSingleResourcePipelineState(metaclass=StateCreator):
-
-    ATTRS = [
-        'raw_resource_id',
-    ]
 
 
 class GetSingleResourcePipelineRunner(PipelineRunner):
