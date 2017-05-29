@@ -66,4 +66,16 @@ def test_proxy_state_operator():
     state = types.SimpleNamespace()
     t = TestDerived()
     t.bind_proxy_state(state)
-    assert set(['a', 'b', 'c', 'd']) == t.PROXY_ATTRS
+    assert set(['a', 'b', 'c', 'd']) == set(t.PROXY_ATTRS.keys())
+
+    class TestDefault(ProxyStateOperator):
+
+        PROXY_ATTRS = [
+            ('foo', 42),
+            'bar',
+        ]
+
+    state = types.SimpleNamespace()
+    t = TestDefault()
+    t.bind_proxy_state(state)
+    assert 42 == state.foo

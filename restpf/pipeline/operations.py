@@ -1,5 +1,8 @@
 from collections import deque
 
+from restpf.utils.helper_classes import (
+    ProxyStateOperator,
+)
 from restpf.utils.helper_functions import (
     method_named_args,
 )
@@ -144,25 +147,22 @@ class ContextRuleWithInputBinding(type):
         return resultcls
 
 
-class _ContextRuleBinder:
+class StateTreeBuilder(ProxyStateOperator):
 
-    @method_named_args('context_rule')
-    def bind_context_rule(self):
-        pass
-
-
-class StateTreeBuilder(_ContextRuleBinder):
+    PROXY_ATTRS = [
+        'raw_resource_id',
+    ]
 
     def _get_id_state_for_input(self, resource):
         return create_attribute_state_tree_for_input(
             resource.id_obj,
-            self.context_rule.raw_resource_id,
+            self.raw_resource_id,
         )
 
     def _get_id_state_for_output(self, resource):
         return create_attribute_state_tree_for_output(
             resource.id_obj,
-            self.context_rule.raw_resource_id,
+            self.raw_resource_id,
         )
 
     async def build_input_state(self, resource):
@@ -172,7 +172,11 @@ class StateTreeBuilder(_ContextRuleBinder):
         raise NotImplemented
 
 
-class RepresentationGenerator(_ContextRuleBinder):
+class RepresentationGenerator(ProxyStateOperator):
+
+    PROXY_ATTRS = [
+        'raw_resource_id',
+    ]
 
     async def generate_representation(self, resource, output_state):
         return {}

@@ -2,6 +2,9 @@ import asyncio
 from functools import wraps
 from collections import defaultdict
 
+from restpf.utils.helper_classes import (
+    ProxyStateOperator,
+)
 from restpf.utils.helper_functions import (
     method_named_args,
     async_call,
@@ -11,6 +14,7 @@ from restpf.utils.helper_classes import TreeState
 
 from .states import ResourceState                   # noqa
 from .states import RawOutputStateContainer         # noqa
+from .states import DefaultPipelineState            # noqa
 
 from .operations import ContextRuleWithInputBinding # noqa
 from .operations import ContextRule                 # noqa
@@ -40,6 +44,7 @@ class PipelineRunner:
     STATE_TREE_BUILDER_CLS = None
     REPRESENTATION_GENERATOR_CLS = None
     PIPELINE_CLS = None
+    PIPELINE_STATE_CLS = DefaultPipelineState
 
     @_meta_build
     def build_context_rule(self):
@@ -53,11 +58,16 @@ class PipelineRunner:
     def build_representation_generator(self):
         pass
 
+    @_meta_build
+    def build_pipeline_state(self):
+        pass
+
     def set_resource(self, resource):
         self.resource = resource
 
     async def run_pipeline(self):
         pipeline = self.PIPELINE_CLS(
+            pipeline_state=self.pipeline_state,
             resource=self.resource,
             context_rule=self.context_rule,
             state_builder=self.state_tree_builder,
@@ -92,7 +102,7 @@ def _merge_output_of_callbacks(output_of_callbacks):
     return helper(ret, None, output_of_callbacks)
 
 
-class PipelineBase:
+class PipelineBase(ProxyStateOperator):
 
     '''
     Pipeline based on following instances:
@@ -112,9 +122,19 @@ class PipelineBase:
     6. validate `output_state`.
     '''
 
+    PROXY_ATTRS = [
+        'input_state',
+        'merged_output_of_callbacks',
+        'output_state',
+        'representation',
+    ]
+
     @method_named_args(
-        'resource', 'context_rule',
-        'state_builder', 'rep_generator',
+        'pipeline_state',
+        'resource',
+        'context_rule',
+        'state_builder',
+        'rep_generator',
     )
     def __init__(self):
         '''
@@ -122,12 +142,10 @@ class PipelineBase:
         2. other entities all reference `context_rule`.
         '''
 
-        self.state_builder.bind_context_rule(
-            context_rule=self.context_rule,
-        )
-        self.rep_generator.bind_context_rule(
-            context_rule=self.context_rule,
-        )
+        self.bind_proxy_state(self.pipeline_state)
+
+        self.state_builder.bind_proxy_state(self.pipeline_state)
+        self.rep_generator.bind_proxy_state(self.pipeline_state)
 
     async def _build_input_state(self):
         self.input_state = await async_call(

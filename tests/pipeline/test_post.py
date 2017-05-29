@@ -46,6 +46,22 @@ async def test_simple_post():
         assert 1 == state.value
 
     tp = PostSingleResourcePipelineRunner()
+    tp.build_pipeline_state(
+        raw_resource_id=None,
+        raw_attributes={
+            'foo': 42,
+            'a': {
+                'b': {
+                    'c': {
+                        'type': 'integer',
+                        'value': 1,
+                    },
+                },
+                'd': 2,
+            }
+        },
+        raw_relationships={},
+    )
     tp.build_context_rule(
         raw_resource_id=None,
         raw_attributes={

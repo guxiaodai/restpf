@@ -1,3 +1,6 @@
+from restpf.utils.helper_classes import (
+    StateCreator,
+)
 from restpf.utils.helper_functions import (
     namedtuple_with_default,
 )
@@ -53,3 +56,7 @@ class CallbackKwargsRegistrar:
         ret['callback_kwargs'] = self
         # bind registered variables.
         ret.update(self._registered_kwargs)
+
+
+class DefaultPipelineState(metaclass=StateCreator):
+    ATTRS = []
