@@ -207,9 +207,9 @@ class StateCreator(type):
 
     # return a simple namespace with parameters of __init__ defined in ATTRS.
     def __new__(cls, name, bases, namespace):
-        resultcls = type.__new__(cls, name, (), namespace)
+        resultcls = type.__new__(cls, name, bases, namespace)
 
-        @method_named_args(*namespace.get('ATTRS'))
+        @method_named_args(*getattr(resultcls, 'ATTRS'))
         def __init__(self):
             pass
 
