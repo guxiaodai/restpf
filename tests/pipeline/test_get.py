@@ -30,7 +30,8 @@ async def test_simple_get():
         return str(resource_id)
 
     tp = GetSingleResourcePipelineRunner()
-    tp.build_context_rule(raw_resource_id=42)
+    tp.build_pipeline_state(raw_resource_id=42)
+    tp.build_context_rule()
     tp.build_state_tree_builder()
     tp.build_representation_generator()
     tp.set_resource(test)

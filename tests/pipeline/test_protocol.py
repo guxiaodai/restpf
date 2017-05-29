@@ -181,6 +181,7 @@ async def test_pipeline():
         PIPELINE_CLS = TestPipeline
 
     tp = TestPipelineRunner()
+    tp.build_pipeline_state()
     tp.build_context_rule()
     tp.build_state_tree_builder()
     tp.build_representation_generator()

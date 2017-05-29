@@ -1,41 +1,25 @@
 import asyncio
 from functools import wraps
-from collections import (
-    deque,
-    namedtuple,
-    defaultdict,
-)
+from collections import defaultdict
 
+from restpf.utils.helper_classes import (
+    ProxyStateOperator,
+)
 from restpf.utils.helper_functions import (
     method_named_args,
     async_call,
     parallel_groups_of_callbacks,
 )
-from restpf.utils.helper_classes import (
-    TreeState,
-)
+from restpf.utils.helper_classes import TreeState
 
-from restpf.resource.attribute_states import (
-    create_attribute_state_tree_for_input,
-    create_attribute_state_tree_for_output,
-)
-from restpf.resource.attributes import (
-    AttributeContextOperator,
-)
+from .states import ResourceState                      # noqa
+from .states import RawOutputStateContainer            # noqa
+from .states import DefaultPipelineState               # noqa
+from .states import CallbackKwargsStateVariableMapper  # noqa
 
-
-# `state`, `input_state`, `output_state` should be instance of ResourceState.
-_COLLECTION_NAMES = ['attributes', 'relationships', 'resource_id']
-
-ResourceState = namedtuple(
-    'ResourceState',
-    _COLLECTION_NAMES,
-)
-
-RawOutputStateContainer = namedtuple(
-    'RawOutputStateContainer',
-    _COLLECTION_NAMES,
-)
+from .operations import ContextRule                    # noqa
+from .operations import StateTreeBuilder               # noqa
+from .operations import RepresentationGenerator        # noqa
 
 
 def _meta_build(method):
@@ -50,20 +34,36 @@ def _meta_build(method):
             self, attr_name,
             getattr(self, cls_name)(*args, **kwargs),
         )
+        # post operations.
+        method(self)
 
     return _wrapper
 
 
 class PipelineRunner:
 
+    CALLBACK_KWARGS_CONTROLLER_CLSES = []
     CONTEXT_RULE_CLS = None
+
     STATE_TREE_BUILDER_CLS = None
     REPRESENTATION_GENERATOR_CLS = None
+
     PIPELINE_CLS = None
+    PIPELINE_STATE_CLS = DefaultPipelineState
+
+    @_meta_build
+    def build_pipeline_state(self):
+        pass
 
     @_meta_build
     def build_context_rule(self):
-        pass
+        # attach callback controller.
+        for controller_cls in self.CALLBACK_KWARGS_CONTROLLER_CLSES:
+            # init and bind to state.
+            controller = controller_cls()
+            controller.bind_proxy_state(self.pipeline_state)
+            # attach.
+            self.context_rule.attach_callback_kwargs_controller(controller)
 
     @_meta_build
     def build_state_tree_builder(self):
@@ -78,6 +78,7 @@ class PipelineRunner:
 
     async def run_pipeline(self):
         pipeline = self.PIPELINE_CLS(
+            pipeline_state=self.pipeline_state,
             resource=self.resource,
             context_rule=self.context_rule,
             state_builder=self.state_tree_builder,
@@ -85,183 +86,6 @@ class PipelineRunner:
         )
         await pipeline.run()
         return pipeline
-
-
-class CallbackKwargsRegistrar:
-
-    def __init__(self):
-        self._registered_kwargs = {}
-
-    def register(self, name, value):
-        assert name.isidentifier()
-        self._registered_kwargs[name] = value
-
-    def callback_kwargs(self, attr, state):
-        ret = {
-            # for callback kwargs registration.
-            'callback_kwargs': self,
-
-            'attr': attr,
-            'state': state,
-        }
-        ret.update(self._registered_kwargs)
-        return ret
-
-
-class ContextRule:
-
-    HTTPMethod = None
-
-    def __init__(self):
-        self._callback_kwargs_registrar = CallbackKwargsRegistrar()
-
-    def _default_validator(self, state):
-        context = AttributeContextOperator(self.HTTPMethod)
-        return all(map(
-            lambda x: x.validate(context),
-            filter(
-                bool,
-                [
-                    state.resource_id,
-                    state.attributes,
-                    state.relationships,
-                ],
-            ),
-        ))
-
-    async def validate_input_state(self, state):
-        return self._default_validator(state)
-
-    async def validate_output_state(self, state):
-        return self._default_validator(state)
-
-    def _select_callbacks(self, query, root_attr, root_state):
-        queue = deque()
-        queue.append(
-            (root_attr, root_state),
-        )
-
-        ret = []
-
-        while queue:
-            attr, state = queue.popleft()
-            callback, options = query(attr.bh_path, self.HTTPMethod)
-
-            if callback and (state or root_state is None):
-                ret.append(
-                    (
-                        callback,
-                        {
-                            'attr': attr,
-                            'state': state,
-                            'options': options,
-                        },
-                    ),
-                )
-
-            for name, child_attr in attr.bh_named_children.items():
-                child_state = getattr(state, name) if state else None
-                queue.append(
-                    (child_attr, child_state),
-                )
-
-        return ret
-
-    # TODO: design bugfix. add mapping from attr collection to state.
-    async def select_callbacks(self, resource, state):
-        '''
-        return ordered collection_name -> [(callback, attr, state), ...].
-        '''
-
-        ret = {}
-        for key in ['special_hooks', 'attributes', 'relationships']:
-            if getattr(resource, key) is None:
-                continue
-
-            attr_collection = getattr(resource, f'{key}_obj')
-
-            ret[key] = self._select_callbacks(
-                getattr(
-                    attr_collection,
-                    'get_registered_callback_and_options',
-                ),
-                getattr(attr_collection, 'attr_obj'),
-                getattr(state, key, None),
-            )
-
-        return ret
-
-    async def callback_kwargs(self, attr, state):
-        return self._callback_kwargs_registrar.callback_kwargs(attr, state)
-
-
-class ContextRuleWithInputBinding(type):
-
-    @classmethod
-    def _inject_methods(cls, attr2kwarg, resultcls):
-
-        # build __init__.
-        @method_named_args(*attr2kwarg.keys())
-        def __init__(self):
-            super(type(self), self).__init__()
-            # register kwargs.
-            for attr_name, kwarg_name in attr2kwarg.items():
-                self._callback_kwargs_registrar.register(
-                    kwarg_name, getattr(self, attr_name),
-                )
-
-        resultcls.__init__ = __init__
-
-    def __new__(cls, name, bases, namespace):
-        # get mapping: attr_name -> kwarg_name
-        attr2kwarg = namespace.get('INPUT_ATTR2KWARG')
-
-        # generate class first.
-        if attr2kwarg:
-            # inject base class.
-            bases = bases + (ContextRule,)
-
-        resultcls = type.__new__(cls, name, bases, namespace)
-
-        if attr2kwarg:
-            # only trigger when the INPUT_ATTR2KWARG is defined.
-            cls._inject_methods(attr2kwarg, resultcls)
-
-        return resultcls
-
-
-class _ContextRuleBinder:
-
-    @method_named_args('context_rule')
-    def bind_context_rule(self):
-        pass
-
-
-class StateTreeBuilder(_ContextRuleBinder):
-
-    def _get_id_state_for_input(self, resource):
-        return create_attribute_state_tree_for_input(
-            resource.id_obj,
-            self.context_rule.raw_resource_id,
-        )
-
-    def _get_id_state_for_output(self, resource):
-        return create_attribute_state_tree_for_output(
-            resource.id_obj,
-            self.context_rule.raw_resource_id,
-        )
-
-    async def build_input_state(self, resource):
-        raise NotImplemented
-
-    async def build_output_state(self, resource, raw_obj):
-        raise NotImplemented
-
-
-class RepresentationGenerator(_ContextRuleBinder):
-
-    async def generate_representation(self, resource, output_state):
-        return {}
 
 
 def _merge_output_of_callbacks(output_of_callbacks):
@@ -289,7 +113,7 @@ def _merge_output_of_callbacks(output_of_callbacks):
     return helper(ret, None, output_of_callbacks)
 
 
-class PipelineBase:
+class PipelineBase(ProxyStateOperator):
 
     '''
     Pipeline based on following instances:
@@ -309,9 +133,19 @@ class PipelineBase:
     6. validate `output_state`.
     '''
 
+    PROXY_ATTRS = [
+        'input_state',
+        'merged_output_of_callbacks',
+        'output_state',
+        'representation',
+    ]
+
     @method_named_args(
-        'resource', 'context_rule',
-        'state_builder', 'rep_generator',
+        'pipeline_state',
+        'resource',
+        'context_rule',
+        'state_builder',
+        'rep_generator',
     )
     def __init__(self):
         '''
@@ -319,12 +153,10 @@ class PipelineBase:
         2. other entities all reference `context_rule`.
         '''
 
-        self.state_builder.bind_context_rule(
-            context_rule=self.context_rule,
-        )
-        self.rep_generator.bind_context_rule(
-            context_rule=self.context_rule,
-        )
+        self.bind_proxy_state(self.pipeline_state)
+
+        self.state_builder.bind_proxy_state(self.pipeline_state)
+        self.rep_generator.bind_proxy_state(self.pipeline_state)
 
     async def _build_input_state(self):
         self.input_state = await async_call(
@@ -394,10 +226,6 @@ class PipelineBase:
 
         for name, tree_state in name2raw_obj.items():
             name2raw_obj[name] = _merge_output_of_callbacks(tree_state)
-
-        for name in _COLLECTION_NAMES:
-            if name not in name2raw_obj:
-                name2raw_obj[name] = {}
 
         self.merged_output_of_callbacks = \
             RawOutputStateContainer(**name2raw_obj)

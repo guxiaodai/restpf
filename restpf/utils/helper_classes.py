@@ -2,6 +2,8 @@ import collections.abc as abc
 import operator
 import copy
 
+from .helper_functions import method_named_args
+
 
 class ContextOperator:
 
@@ -132,3 +134,77 @@ class TreeState:
         self._obj[self._VALUE] = value
 
     value = property(_value_get, _value_set)
+
+
+class ProxyStateOperator:
+
+    PROXY_ATTRS = []
+
+    def _cache_hierarchy_proxy_attrs(self):
+        ret = {}
+
+        for _cls in type(self).__mro__:
+            PROXY_ATTRS = getattr(_cls, 'PROXY_ATTRS', None)
+            if PROXY_ATTRS is None:
+                continue
+
+            for attr in PROXY_ATTRS:
+                if isinstance(attr, str):
+                    name = attr
+                    default = None
+                elif isinstance(attr, abc.Sequence) and len(attr) == 2:
+                    name, default = attr
+                else:
+                    raise RuntimeError("wrong format of PROXY_ATTRS.")
+
+                ret[name] = default
+
+        return ret
+
+    def bind_proxy_state(self, state):
+        # cache PROXY_ATTRS.
+        self.PROXY_ATTRS = self._cache_hierarchy_proxy_attrs()
+        # bind state.
+        self._pso_proxy_state = state
+        # __getattribute__ works now.
+        # bind default value.
+        for name, default in self.PROXY_ATTRS.items():
+            if getattr(self, name) is None:
+                setattr(self, name, default)
+
+    def __getattribute__(self, name):
+        use_default = False
+        try:
+            PROXY_ATTRS = object.__getattribute__(
+                self, 'PROXY_ATTRS',
+            )
+            _pso_proxy_state = object.__getattribute__(
+                self, '_pso_proxy_state',
+            )
+        except AttributeError:
+            use_default = True
+
+        if use_default or name not in PROXY_ATTRS:
+            return object.__getattribute__(self, name)
+        else:
+            return getattr(_pso_proxy_state, name, None)
+
+    def __setattr__(self, name, value):
+        if name in self.PROXY_ATTRS:
+            setattr(self._pso_proxy_state, name, value)
+        else:
+            object.__setattr__(self, name, value)
+
+
+class StateCreator(type):
+
+    # return a simple namespace with parameters of __init__ defined in ATTRS.
+    def __new__(cls, name, bases, namespace):
+        resultcls = type.__new__(cls, name, (), namespace)
+
+        @method_named_args(*namespace.get('ATTRS'))
+        def __init__(self):
+            pass
+
+        resultcls.__init__ = __init__
+        return resultcls
