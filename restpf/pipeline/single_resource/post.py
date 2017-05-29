@@ -8,7 +8,8 @@ from restpf.resource.attribute_states import (
     create_attribute_state_tree_for_input,
 )
 from restpf.pipeline.protocol import (
-    ContextRuleWithInputBinding,
+    ContextRule,
+    CallbackKwargsStateVariableMapper,
     StateTreeBuilder,
     RepresentationGenerator,
     ResourceState,
@@ -17,11 +18,20 @@ from restpf.pipeline.protocol import (
 )
 
 
-class PostSingleResourceContextRule(metaclass=ContextRuleWithInputBinding):
+class PostSingleResourceContextRule(ContextRule):
 
     HTTPMethod = HTTPMethodConfig.POST
 
-    INPUT_ATTR2KWARG = {
+
+class PostSingleResourceCallbackKwargsStateVariableMapper(
+    CallbackKwargsStateVariableMapper,
+):
+    PROXY_ATTRS = [
+        'raw_resource_id',
+        'raw_attributes',
+        'raw_relationships',
+    ]
+    ATTR2KWARG = {
         'raw_resource_id': 'resource_id',
         'raw_attributes': 'raw_attributes',
         'raw_relationships': 'raw_relationships',
@@ -64,6 +74,7 @@ class PostSingleResourceRepresentationGenerator(RepresentationGenerator):
 
 
 class PostSingleResourcePipelineState(metaclass=StateCreator):
+
     ATTRS = [
         'raw_resource_id',
         'raw_attributes',
@@ -73,8 +84,13 @@ class PostSingleResourcePipelineState(metaclass=StateCreator):
 
 class PostSingleResourcePipelineRunner(PipelineRunner):
 
+    CALLBACK_KWARGS_CONTROLLER_CLSES = [
+        PostSingleResourceCallbackKwargsStateVariableMapper,
+    ]
     CONTEXT_RULE_CLS = PostSingleResourceContextRule
+
     STATE_TREE_BUILDER_CLS = PostSingleResourceStateTreeBuilder
     REPRESENTATION_GENERATOR_CLS = PostSingleResourceRepresentationGenerator
+
     PIPELINE_CLS = SingleResourcePipeline
     PIPELINE_STATE_CLS = PostSingleResourcePipelineState

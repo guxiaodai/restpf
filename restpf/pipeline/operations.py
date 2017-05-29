@@ -3,9 +3,6 @@ from collections import deque
 from restpf.utils.helper_classes import (
     ProxyStateOperator,
 )
-from restpf.utils.helper_functions import (
-    method_named_args,
-)
 from restpf.resource.attributes import (
     AttributeContextOperator,
 )
@@ -108,43 +105,11 @@ class ContextRule:
 
         return ret
 
+    def attach_callback_kwargs_controller(self, controller):
+        self._callback_kwargs_processor.add_controller(controller)
+
     async def callback_kwargs(self, attr, state):
         return self._callback_kwargs_processor.callback_kwargs(attr, state)
-
-
-class ContextRuleWithInputBinding(type):
-
-    @classmethod
-    def _inject_methods(cls, attr2kwarg, resultcls):
-
-        # build __init__.
-        @method_named_args(*attr2kwarg.keys())
-        def __init__(self):
-            super(type(self), self).__init__()
-            # register kwargs.
-            for attr_name, kwarg_name in attr2kwarg.items():
-                self._callback_kwargs_registrar.register(
-                    kwarg_name, getattr(self, attr_name),
-                )
-
-        resultcls.__init__ = __init__
-
-    def __new__(cls, name, bases, namespace):
-        # get mapping: attr_name -> kwarg_name
-        attr2kwarg = namespace.get('INPUT_ATTR2KWARG')
-
-        # generate class first.
-        if attr2kwarg:
-            # inject base class.
-            bases = bases + (ContextRule,)
-
-        resultcls = type.__new__(cls, name, bases, namespace)
-
-        if attr2kwarg:
-            # only trigger when the INPUT_ATTR2KWARG is defined.
-            cls._inject_methods(attr2kwarg, resultcls)
-
-        return resultcls
 
 
 class StateTreeBuilder(ProxyStateOperator):

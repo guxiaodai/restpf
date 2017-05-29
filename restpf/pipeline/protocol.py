@@ -12,14 +12,14 @@ from restpf.utils.helper_functions import (
 )
 from restpf.utils.helper_classes import TreeState
 
-from .states import ResourceState                   # noqa
-from .states import RawOutputStateContainer         # noqa
-from .states import DefaultPipelineState            # noqa
+from .states import ResourceState                      # noqa
+from .states import RawOutputStateContainer            # noqa
+from .states import DefaultPipelineState               # noqa
+from .states import CallbackKwargsStateVariableMapper  # noqa
 
-from .operations import ContextRuleWithInputBinding # noqa
-from .operations import ContextRule                 # noqa
-from .operations import StateTreeBuilder            # noqa
-from .operations import RepresentationGenerator     # noqa
+from .operations import ContextRule                    # noqa
+from .operations import StateTreeBuilder               # noqa
+from .operations import RepresentationGenerator        # noqa
 
 
 def _meta_build(method):
@@ -34,21 +34,36 @@ def _meta_build(method):
             self, attr_name,
             getattr(self, cls_name)(*args, **kwargs),
         )
+        # post operations.
+        method(self)
 
     return _wrapper
 
 
 class PipelineRunner:
 
+    CALLBACK_KWARGS_CONTROLLER_CLSES = []
     CONTEXT_RULE_CLS = None
+
     STATE_TREE_BUILDER_CLS = None
     REPRESENTATION_GENERATOR_CLS = None
+
     PIPELINE_CLS = None
     PIPELINE_STATE_CLS = DefaultPipelineState
 
     @_meta_build
-    def build_context_rule(self):
+    def build_pipeline_state(self):
         pass
+
+    @_meta_build
+    def build_context_rule(self):
+        # attach callback controller.
+        for controller_cls in self.CALLBACK_KWARGS_CONTROLLER_CLSES:
+            # init and bind to state.
+            controller = controller_cls()
+            controller.bind_proxy_state(self.pipeline_state)
+            # attach.
+            self.context_rule.attach_callback_kwargs_controller(controller)
 
     @_meta_build
     def build_state_tree_builder(self):
@@ -56,10 +71,6 @@ class PipelineRunner:
 
     @_meta_build
     def build_representation_generator(self):
-        pass
-
-    @_meta_build
-    def build_pipeline_state(self):
         pass
 
     def set_resource(self, resource):

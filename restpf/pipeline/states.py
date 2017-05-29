@@ -1,5 +1,6 @@
 from restpf.utils.helper_classes import (
     StateCreator,
+    ProxyStateOperator,
 )
 from restpf.utils.helper_functions import (
     namedtuple_with_default,
@@ -58,5 +59,17 @@ class CallbackKwargsRegistrar:
         ret.update(self._registered_kwargs)
 
 
+class CallbackKwargsStateVariableMapper(ProxyStateOperator):
+
+    PROXY_ATTRS = []
+    ATTR2KWARG = {}
+
+    def update(self, ret):
+        for name in self.PROXY_ATTRS:
+            kwarg_name = self.ATTR2KWARG[name]
+            ret[kwarg_name] = getattr(self, name)
+
+
 class DefaultPipelineState(metaclass=StateCreator):
+
     ATTRS = []

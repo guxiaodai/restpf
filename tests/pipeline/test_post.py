@@ -62,22 +62,7 @@ async def test_simple_post():
         },
         raw_relationships={},
     )
-    tp.build_context_rule(
-        raw_resource_id=None,
-        raw_attributes={
-            'foo': 42,
-            'a': {
-                'b': {
-                    'c': {
-                        'type': 'integer',
-                        'value': 1,
-                    },
-                },
-                'd': 2,
-            }
-        },
-        raw_relationships={},
-    )
+    tp.build_context_rule()
     tp.build_state_tree_builder()
     tp.build_representation_generator()
     tp.set_resource(test)
