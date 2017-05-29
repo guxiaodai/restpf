@@ -9,7 +9,6 @@ from restpf.resource.attribute_states import (
 )
 
 from restpf.pipeline.protocol import (
-    # ContextRuleWithInputBinding,
     ContextRule,
     CallbackKwargsStateVariableMapper,
     StateTreeBuilder,

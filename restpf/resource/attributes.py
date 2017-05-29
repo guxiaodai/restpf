@@ -131,9 +131,11 @@ class Attribute(BehaviorTreeNode):
         appear_setter = self._generate_options_setter(AppearanceConfig)
 
         appear_setter('appear_in_get', AppearanceConfig.FREE)
-        appear_setter('appear_in_patch', AppearanceConfig.FREE)
         appear_setter('appear_in_post', AppearanceConfig.REQUIRE)
+        appear_setter('appear_in_patch', AppearanceConfig.FREE)
+        appear_setter('appear_in_delete', AppearanceConfig.FREE)
         appear_setter('appear_in_put', AppearanceConfig.REQUIRE)
+        appear_setter('appear_in_options', AppearanceConfig.FREE)
 
     def _init_object_unknow_name_options(self, *options):
         unknow_setter = self._generate_options_setter(UnknowAttributeConfig)
@@ -141,7 +143,9 @@ class Attribute(BehaviorTreeNode):
         unknow_setter('unknown_in_get', UnknowAttributeConfig.PROHIBITE)
         unknow_setter('unknown_in_patch', UnknowAttributeConfig.IGNORE)
         unknow_setter('unknown_in_post', UnknowAttributeConfig.IGNORE)
+        unknow_setter('unknown_in_delete', UnknowAttributeConfig.IGNORE)
         unknow_setter('unknown_in_put', UnknowAttributeConfig.IGNORE)
+        unknow_setter('unknown_in_options', UnknowAttributeConfig.IGNORE)
 
     def rename(self, name):
         self.bh_rename(name)
@@ -157,6 +161,8 @@ def _generate_http_method_context_operator(method_prefix):
         HTTPMethodConfig.PATCH: f'{method_prefix}_in_patch',
         HTTPMethodConfig.POST: f'{method_prefix}_in_post',
         HTTPMethodConfig.PUT: f'{method_prefix}_in_put',
+        HTTPMethodConfig.DELETE: f'{method_prefix}_in_delete',
+        HTTPMethodConfig.OPTIONS: f'{method_prefix}_in_options',
     }
 
 
