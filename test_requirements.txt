@@ -6,3 +6,4 @@ pytest-travis-fold
 pytest-asyncio
 coveralls
 wheel
+aiohttp
