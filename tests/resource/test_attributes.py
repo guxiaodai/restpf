@@ -96,6 +96,13 @@ def test_bool():
     })
 
 
+def test_best_effort_conversion():
+    attr = Integer(best_effort_conversion=BestEffortConversionConfig.ENABLE)
+    assert_validate_output(attr, 42)
+    assert_validate_output(attr, '42')
+    assert_not_validate_output(attr, '42.0')
+
+
 def test_array_output():
     attr = Array(Integer)
 

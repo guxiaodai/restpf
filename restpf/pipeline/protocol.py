@@ -149,13 +149,9 @@ class PipelineBase(ProxyStateOperator):
         'rep_generator',
     )
     def __init__(self):
-        '''
-        1. `context_rule` holds all the states of input.
-        2. other entities all reference `context_rule`.
-        '''
-
         self.bind_proxy_state(self.pipeline_state)
 
+        # context_rule do not get bound to state.
         self.state_builder.bind_proxy_state(self.pipeline_state)
         self.rep_generator.bind_proxy_state(self.pipeline_state)
 

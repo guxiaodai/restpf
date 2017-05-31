@@ -43,12 +43,6 @@ class SanicDriver(WebFrameworkDriverInterface):
     def callback_wrapper(self, callback, variables):
         variables = to_iterable(variables)
 
-        parameters = (
-            Parameter(name, Parameter.POSITIONAL_OR_KEYWORD)
-            for name in itertools.chain(('request',), variables)
-        )
-        signature = Signature(parameters)
-
         async def sanic_callback_wrapper(request, **kwargs):
             # status
             # headers: dict.
@@ -70,7 +64,13 @@ class SanicDriver(WebFrameworkDriverInterface):
                 status=status,
             )
 
+        parameters = (
+            Parameter(name, Parameter.POSITIONAL_OR_KEYWORD)
+            for name in itertools.chain(('request',), variables)
+        )
+        signature = Signature(parameters)
         sanic_callback_wrapper.__signature__ = signature
+
         return sanic_callback_wrapper
 
     def create_global_namespace(self):

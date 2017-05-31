@@ -13,6 +13,7 @@ from .attributes import (
     Object,
     AppearanceConfig,
     UnknowAttributeConfig,
+    BestEffortConversionConfig,
 )
 from restpf.utils.behavior_tree import (
     BehaviorTreeNodeStateLeaf,
@@ -101,7 +102,18 @@ class LeafAttributeState(BehaviorTreeNodeStateLeaf):
 
     @nullable_processor
     def validate(self, attr_context):
-        return isinstance(self.bh_value, self.PYTHON_TYPE)
+        if not isinstance(self.bh_value, self.PYTHON_TYPE):
+            if attr_context.best_effort_conversion(self.bh_node) is \
+                    BestEffortConversionConfig.DISABLE:
+                return False
+            try:
+                value = self.PYTHON_TYPE(self.bh_value)
+                self.bh_value = value
+                return True
+            except ValueError:
+                return False
+        else:
+            return True
 
     def serialize(self):
         raise NotImplemented

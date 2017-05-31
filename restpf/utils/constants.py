@@ -36,6 +36,12 @@ class UnknowAttributeConfig(EnumByUpperCaseName):
     PROHIBITE = auto()
 
 
+class BestEffortConversionConfig(EnumByUpperCaseName):
+
+    ENABLE = auto()
+    DISABLE = auto()
+
+
 class CallbackRegistrarOptions(EnumByLowerCaseName):
 
     BEFORE_ALL = auto()
