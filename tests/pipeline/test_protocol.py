@@ -1,4 +1,5 @@
 import pytest
+import types
 
 from tests.utils.attr_config import *
 
@@ -17,7 +18,6 @@ from restpf.pipeline.protocol import (
     StateTreeBuilder,
     RepresentationGenerator,
     PipelineBase,
-    ResourceState,
     _merge_output_of_callbacks,
     PipelineRunner,
 )
@@ -58,9 +58,11 @@ async def test_resource_definition():
         return 4
 
     ct = TestContext()
+    ct.bind_proxy_state(types.SimpleNamespace())
+
     ret = await async_call(
         ct.select_callbacks,
-        rd, ResourceState(None, None, None),
+        rd,
     )
 
     assert 'attributes' in ret
@@ -98,7 +100,7 @@ async def test_pipeline():
     class TestStateBuilder(StateTreeBuilder):
 
         async def build_input_state(self, resource):
-            attributes = create_attribute_state_tree(
+            self.input_attributes = create_attribute_state_tree(
                 resource.attributes_obj.attr_obj,
                 # input.
                 {
@@ -107,36 +109,36 @@ async def test_pipeline():
                 },
                 node2statecls_default_input,
             )
-            resource_id = create_attribute_state_tree(
+            self.input_resource_id = create_attribute_state_tree(
                 resource.id_obj,
                 None,
                 node2statecls_default_input,
             )
-            return ResourceState(attributes, None, resource_id)
+            self.input_relationships = None
 
-        async def build_output_state(self, resource, raw_obj):
-            attributes = create_attribute_state_tree(
+        async def build_output_state(self, resource):
+            self.output_attributes = create_attribute_state_tree(
                 resource.attributes_obj.attr_obj,
                 # output.
-                raw_obj.attributes,
+                self.internal_attributes,
                 node2statecls_default_output,
             )
 
-            assert not raw_obj.resource_id
-            resource_id = create_attribute_state_tree(
+            assert not self.internal_resource_id
+            self.output_resource_id = create_attribute_state_tree(
                 resource.id_obj,
                 42,
                 node2statecls_default_output,
             )
-            return ResourceState(attributes, None, resource_id)
+            self.output_relationships = None
 
     class TestRepGen(RepresentationGenerator):
 
-        def generate_representation(self, resource, output_state):
+        def generate_representation(self, resource):
 
             return {
-                'id': output_state.resource_id.serialize(),
-                'attributes': output_state.attributes.serialize(),
+                'id': self.output_resource_id.serialize(),
+                'attributes': self.output_attributes.serialize(),
             }
 
     class TestPipeline(PipelineBase):

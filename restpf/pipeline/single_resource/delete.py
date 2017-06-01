@@ -10,7 +10,6 @@ from restpf.pipeline.protocol import (
     CallbackKwargsStateVariableMapper,
     StateTreeBuilder,
     RepresentationGenerator,
-    ResourceState,
     PipelineRunner,
     SingleResourcePipeline,
 )
@@ -39,24 +38,19 @@ class DeleteSingleResourceContextRule(ContextRule):
 class DeleteSingleResourceStateTreeBuilder(StateTreeBuilder):
 
     def build_input_state(self, resource):
-        return ResourceState(
-            attributes=None,
-            relationships=None,
-            # for id validation.
-            resource_id=self._get_id_state_for_input(resource),
-        )
+        self.input_attributes = None
+        self.input_relationships = None
+        self.input_resource_id = self._get_id_state_for_input(resource)
 
-    def build_output_state(self, resource, raw_obj):
-        return ResourceState(
-            attributes=None,
-            relationships=None,
-            resource_id=None,
-        )
+    def build_output_state(self, resource):
+        self.output_attributes = None
+        self.output_relationships = None
+        self.output_resource_id = None
 
 
 class DeleteSingleResourceRepresentationGenerator(RepresentationGenerator):
 
-    def generate_representation(self, resource, output_state):
+    def generate_representation(self, resource):
         return None
 
 

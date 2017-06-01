@@ -12,8 +12,12 @@ from restpf.utils.helper_functions import (
 )
 from restpf.utils.helper_classes import TreeState
 
-from .states import ResourceState                      # noqa
-from .states import RawOutputStateContainer            # noqa
+from .states import (
+    _INPUT_STATE_NAMES,
+    _INTERNAL_STATE_NAMES,
+    _OUTPUT_STATE_NAMES,
+)
+
 from .states import DefaultPipelineState               # noqa
 from .states import CallbackKwargsStateVariableMapper  # noqa
 from .states import CallbackKwargsVariableCollector    # noqa
@@ -135,7 +139,10 @@ class PipelineBase(ProxyStateOperator):
     '''
 
     PROXY_ATTRS = [
-        'input_state',
+        *_INPUT_STATE_NAMES,
+        *_INTERNAL_STATE_NAMES,
+        *_OUTPUT_STATE_NAMES,
+
         'merged_output_of_callbacks',
         'output_state',
         'representation',
@@ -151,19 +158,18 @@ class PipelineBase(ProxyStateOperator):
     def __init__(self):
         self.bind_proxy_state(self.pipeline_state)
 
-        # context_rule do not get bound to state.
+        self.context_rule.bind_proxy_state(self.pipeline_state)
         self.state_builder.bind_proxy_state(self.pipeline_state)
         self.rep_generator.bind_proxy_state(self.pipeline_state)
 
     async def _build_input_state(self):
-        self.input_state = await async_call(
+        await async_call(
             self.state_builder.build_input_state,
             self.resource,
         )
 
         input_state_is_valid = await async_call(
             self.context_rule.validate_input_state,
-            self.input_state,
         )
         if not input_state_is_valid:
             raise RuntimeError('TODO: input state not valid')
@@ -173,7 +179,7 @@ class PipelineBase(ProxyStateOperator):
 
         name2selected = await async_call(
             self.context_rule.select_callbacks,
-            self.resource, self.input_state,
+            self.resource,
         )
 
         callback2options = {}
@@ -221,20 +227,20 @@ class PipelineBase(ProxyStateOperator):
 
                 name2raw_obj[name].touch(path).value = ret
 
+        # TODO: too dirty, fix it.
         for name, tree_state in name2raw_obj.items():
-            name2raw_obj[name] = _merge_output_of_callbacks(tree_state)
-
-        self.merged_output_of_callbacks = \
-            RawOutputStateContainer(**name2raw_obj)
+            setattr(
+                self, f'internal_{name}',
+                _merge_output_of_callbacks(tree_state),
+            )
 
     async def _build_output_state(self):
-        self.output_state = await async_call(
+        await async_call(
             self.state_builder.build_output_state,
-            self.resource, self.merged_output_of_callbacks,
+            self.resource,
         )
         output_state_is_valid = await async_call(
             self.context_rule.validate_output_state,
-            self.output_state,
         )
         if not output_state_is_valid:
             raise RuntimeError('TODO: output state not valid')
@@ -244,7 +250,7 @@ class PipelineBase(ProxyStateOperator):
         if self.rep_generator:
             self.representation = await async_call(
                 self.rep_generator.generate_representation,
-                self.resource, self.output_state,
+                self.resource,
             )
 
     async def run(self):

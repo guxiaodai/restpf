@@ -13,7 +13,6 @@ from restpf.pipeline.protocol import (
     CallbackKwargsStateVariableMapper,
     StateTreeBuilder,
     RepresentationGenerator,
-    ResourceState,
     PipelineRunner,
     SingleResourcePipeline,
 )
@@ -42,36 +41,31 @@ class GetSingleResourceContextRule(ContextRule):
 class GetSingleResourceStateTreeBuilder(StateTreeBuilder):
 
     def build_input_state(self, resource):
-        return ResourceState(
-            attributes=None,
-            relationships=None,
-            # for id validation.
-            resource_id=self._get_id_state_for_input(resource),
-        )
+        self.input_attributes = None
+        self.input_relationships = None
+        self.input_resource_id = self._get_id_state_for_input(resource)
 
-    def build_output_state(self, resource, raw_obj):
-        return ResourceState(
-            attributes=create_attribute_state_tree_for_output(
-                resource.attributes_obj.attr_obj,
-                raw_obj.attributes,
-            ),
-            relationships=create_attribute_state_tree_for_output(
-                resource.relationships_obj.attr_obj,
-                raw_obj.relationships,
-            ),
-            # no need to validate.
-            resource_id=None,
+    def build_output_state(self, resource):
+        self.output_attributes = create_attribute_state_tree_for_output(
+            resource.attributes_obj.attr_obj,
+            self.internal_attributes,
         )
+        self.output_relationships = create_attribute_state_tree_for_output(
+            resource.relationships_obj.attr_obj,
+            self.internal_relationships,
+        )
+        # no need to validate.
+        self.output_resource_id = None
 
 
 class GetSingleResourceRepresentationGenerator(RepresentationGenerator):
 
-    def generate_representation(self, resource, output_state):
+    def generate_representation(self, resource):
         return {
             'id': self.raw_resource_id,
             'type': resource.name,
-            'attributes': output_state.attributes.serialize(),
-            'relationships': output_state.relationships.serialize(),
+            'attributes': self.output_attributes.serialize(),
+            'relationships': self.output_relationships.serialize(),
         }
 
 

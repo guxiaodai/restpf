@@ -14,12 +14,20 @@ from restpf.resource.attribute_states import (
 from .states import (
     CallbackKwargsProcessor,
     CallbackKwargsRegistrar,
+    _INPUT_STATE_NAMES,
+    _INTERNAL_STATE_NAMES,
+    _OUTPUT_STATE_NAMES,
 )
 
 
-class ContextRule:
+class ContextRule(ProxyStateOperator):
 
     HTTPMethod = None
+
+    PROXY_ATTRS = [
+        *_INPUT_STATE_NAMES,
+        *_OUTPUT_STATE_NAMES,
+    ]
 
     def __init__(self):
         self._callback_kwargs_processor = CallbackKwargsProcessor()
@@ -29,25 +37,24 @@ class ContextRule:
             self._callback_kwargs_registrar,
         )
 
-    def _default_validator(self, state):
+    def _default_validator(self, names):
         context = AttributeContextOperator(self.HTTPMethod)
         return all(map(
             lambda x: x.validate(context),
             filter(
                 bool,
-                [
-                    state.resource_id,
-                    state.attributes,
-                    state.relationships,
-                ],
+                map(
+                    lambda name: getattr(self, name),
+                    names,
+                )
             ),
         ))
 
-    async def validate_input_state(self, state):
-        return self._default_validator(state)
+    async def validate_input_state(self):
+        return self._default_validator(_INPUT_STATE_NAMES)
 
-    async def validate_output_state(self, state):
-        return self._default_validator(state)
+    async def validate_output_state(self):
+        return self._default_validator(_OUTPUT_STATE_NAMES)
 
     def _select_callbacks(self, query, root_attr, root_state):
         queue = deque()
@@ -82,7 +89,7 @@ class ContextRule:
 
         return ret
 
-    async def select_callbacks(self, resource, state):
+    async def select_callbacks(self, resource):
         '''
         return ordered collection_name -> [(callback, attr, state), ...].
         '''
@@ -100,7 +107,8 @@ class ContextRule:
                     'get_registered_callback_and_options',
                 ),
                 getattr(attr_collection, 'attr_obj'),
-                getattr(state, key, None),
+                # TODO: too dirty, fix it.
+                getattr(self, f'input_{key}', None),
             )
 
         return ret
@@ -115,6 +123,10 @@ class ContextRule:
 class StateTreeBuilder(ProxyStateOperator):
 
     PROXY_ATTRS = [
+        *_INPUT_STATE_NAMES,
+        *_INTERNAL_STATE_NAMES,
+        *_OUTPUT_STATE_NAMES,
+
         'raw_resource_id',
     ]
 
@@ -133,15 +145,17 @@ class StateTreeBuilder(ProxyStateOperator):
     async def build_input_state(self, resource):
         raise NotImplemented
 
-    async def build_output_state(self, resource, raw_obj):
+    async def build_output_state(self, resource):
         raise NotImplemented
 
 
 class RepresentationGenerator(ProxyStateOperator):
 
     PROXY_ATTRS = [
+        *_OUTPUT_STATE_NAMES,
+
         'raw_resource_id',
     ]
 
-    async def generate_representation(self, resource, output_state):
+    async def generate_representation(self, resource):
         return {}

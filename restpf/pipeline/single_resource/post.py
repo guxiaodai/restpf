@@ -13,7 +13,6 @@ from restpf.pipeline.protocol import (
     CallbackKwargsVariableCollector,
     StateTreeBuilder,
     RepresentationGenerator,
-    ResourceState,
     PipelineRunner,
     SingleResourcePipeline,
 )
@@ -59,29 +58,25 @@ class PostSingleResourceStateTreeBuilder(StateTreeBuilder):
     ]
 
     def build_input_state(self, resource):
-        return ResourceState(
-            attributes=create_attribute_state_tree_for_input(
-                resource.attributes_obj.attr_obj,
-                self.raw_attributes,
-            ),
-            relationships=create_attribute_state_tree_for_input(
-                resource.relationships_obj.attr_obj,
-                self.raw_relationships,
-            ),
-            resource_id=self._get_id_state_for_input(resource),
+        self.input_attributes = create_attribute_state_tree_for_input(
+            resource.attributes_obj.attr_obj,
+            self.raw_attributes,
         )
+        self.input_relationships = create_attribute_state_tree_for_input(
+            resource.relationships_obj.attr_obj,
+            self.raw_relationships,
+        )
+        self.input_resource_id = self._get_id_state_for_input(resource)
 
-    def build_output_state(self, resource, raw_obj):
-        return ResourceState(
-            attributes=None,
-            relationships=None,
-            resource_id=None,
-        )
+    def build_output_state(self, resource):
+        self.output_attributes = None
+        self.output_relationships = None
+        self.output_resource_id = None
 
 
 class PostSingleResourceRepresentationGenerator(RepresentationGenerator):
 
-    def generate_representation(self, resource, output_state):
+    def generate_representation(self, resource):
         # no return.
         return None
 

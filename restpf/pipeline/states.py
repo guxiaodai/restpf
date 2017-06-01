@@ -2,24 +2,25 @@ from restpf.utils.helper_classes import (
     StateCreator,
     ProxyStateOperator,
 )
-from restpf.utils.helper_functions import (
-    namedtuple_with_default,
-)
 
 
-_COLLECTION_NAMES = tuple(map(
-    lambda k: (k, {}),
-    ('attributes', 'relationships', 'resource_id'),
-))
+_INPUT_STATE_NAMES = [
+    'input_resource_id',
+    'input_attributes',
+    'input_relationships',
+]
 
-ResourceState = namedtuple_with_default(
-    'ResourceState',
-    *_COLLECTION_NAMES,
-)
-RawOutputStateContainer = namedtuple_with_default(
-    'RawOutputStateContainer',
-    *_COLLECTION_NAMES,
-)
+_INTERNAL_STATE_NAMES = [
+    'internal_resource_id',
+    ('internal_attributes', dict),
+    ('internal_relationships', dict),
+]
+
+_OUTPUT_STATE_NAMES = [
+    'output_resource_id',
+    'output_attributes',
+    'output_relationships',
+]
 
 
 class CallbackKwargsProcessor:

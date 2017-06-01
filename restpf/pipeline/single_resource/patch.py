@@ -44,7 +44,7 @@ class PatchSingleResourceStateTreeBuilder(
 
 class PatchSingleResourceRepresentationGenerator(RepresentationGenerator):
 
-    def generate_representation(self, resource, output_state):
+    def generate_representation(self, resource):
         # no return.
         return None
 
