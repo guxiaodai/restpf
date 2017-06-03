@@ -3,9 +3,11 @@ from restpf.utils.helper_classes import (
 )
 from restpf.resource.attributes import (
     HTTPMethodConfig,
+    AttributeContextOperator,
 )
 from restpf.resource.attribute_states import (
     create_attribute_state_tree_for_input,
+    create_attribute_state_tree_for_output,
 )
 from restpf.pipeline.protocol import (
     ContextRule,
@@ -31,9 +33,12 @@ class PostSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper,
 ):
     ATTR2KWARG = {
-        'raw_resource_id': 'submitted_resource_id',
+        # raw submitted..
+        'raw_resource_id': 'raw_resource_id',
         'raw_attributes': 'raw_attributes',
         'raw_relationships': 'raw_relationships',
+        # parsed submitted.
+        'input_resource_id': 'submitted_resource_id',
     }
 
 
@@ -43,6 +48,15 @@ class PostSingleResourceCallbackKwargsVariableCollector(
     VARIABLES = [
         'generated_resource_id',
     ]
+
+    def preprocessor_generated_resource_id(self, value):
+        state = create_attribute_state_tree_for_output(
+            self.resource.id_obj, value,
+        )
+        if not state.validate(AttributeContextOperator(HTTPMethodConfig.GET)):
+            raise RuntimeError('generated_resource_id is wrong.')
+
+        return state
 
 
 class PostSingleResourceContextRule(ContextRule):

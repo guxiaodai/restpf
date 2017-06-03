@@ -29,7 +29,7 @@ async def test_simple_patch():
     def foo(resource_id, state):
         called.append(foo)
 
-        assert 42 == resource_id
+        assert 42 == resource_id.value
         assert 1 == state.value
 
     tp = PatchSingleResourcePipelineRunner()

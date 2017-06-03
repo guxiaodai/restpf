@@ -72,9 +72,26 @@ async def async_call(func, *args, **kwargs):
         return func(*args, **kwargs)
 
 
+def is_2_sequence(value):
+    return isinstance(value, abc.Sequence) and len(value) == 2
+
+
 def bind_self_with_options(names, self, options):
     for name in names:
-        setattr(self, name, options.get(name))
+
+        if isinstance(name, str):
+            value = options.get(name)
+            setattr(self, name, value)
+
+        elif is_2_sequence(name):
+            name, init_method_name = name
+            value = options.get(name)
+
+            init_method = getattr(self, init_method_name, None)
+            if init_method:
+                init_method(value)
+        else:
+            raise RuntimeError('bind_self_with_options')
 
 
 def method_named_args(*names):
@@ -84,9 +101,13 @@ def method_named_args(*names):
         @wraps(init)
         def _wrapper(self, *args, **kwargs):
             bind_self_with_options(names, self, kwargs)
+
             # remove from kwargs.
             for name in names:
+                if is_2_sequence(name):
+                    name, _ = name
                 kwargs.pop(name, None)
+
             # pass to original init.
             init(self, *args, **kwargs)
 

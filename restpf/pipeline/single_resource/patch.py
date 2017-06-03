@@ -25,9 +25,12 @@ class PatchSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper,
 ):
     ATTR2KWARG = {
-        'raw_resource_id': 'resource_id',
+        # raw submitted..
+        'raw_resource_id': 'raw_resource_id',
         'raw_attributes': 'raw_attributes',
         'raw_relationships': 'raw_relationships',
+        # parsed submitted.
+        'input_resource_id': 'resource_id',
     }
 
 

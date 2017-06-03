@@ -88,6 +88,10 @@ class _CallbackKwargsVariableCollectorPropertyGenerator(type):
                 return getattr(self, attach_name).get(var)
 
             def _setter(self, value):
+                preprocessor = getattr(self, f'preprocessor_{var}', None)
+                if preprocessor:
+                    value = preprocessor(value)
+
                 getattr(self, attach_name)[var] = value
 
             setattr(resultcls, var, property(_getter, _setter))
@@ -104,7 +108,7 @@ class CallbackKwargsVariableCollector(
 
     @classmethod
     def _get_proxy_attrs(cls):
-        return (cls.ATTACH_TO,)
+        return (cls.ATTACH_TO, 'resource')
 
     def update(self, ret):
         # bind registrar.

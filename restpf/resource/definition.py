@@ -24,6 +24,7 @@ import inspect
 from restpf.utils.constants import (
     HTTPMethodConfig,
     CallbackRegistrarOptions,
+    BestEffortConversionConfig,
 )
 from restpf.utils.helper_classes import (
     TreeState,
@@ -289,6 +290,7 @@ class Resource:
                 appear_in_post=id_appear_in_post,
                 appear_in_patch=AppearanceConfig.REQUIRE,
                 appear_in_put=AppearanceConfig.REQUIRE,
+                best_effort_conversion=BestEffortConversionConfig.ENABLE,
             )
         else:
             return id_attr

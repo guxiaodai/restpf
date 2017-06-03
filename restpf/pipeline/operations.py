@@ -152,9 +152,8 @@ class StateTreeBuilder(ProxyStateOperator):
 class RepresentationGenerator(ProxyStateOperator):
 
     PROXY_ATTRS = [
+        *_INPUT_STATE_NAMES,
         *_OUTPUT_STATE_NAMES,
-
-        'raw_resource_id',
     ]
 
     async def generate_representation(self, resource):

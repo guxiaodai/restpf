@@ -23,7 +23,7 @@ async def test_simple_delete():
 
     @test.special_hooks.before_all.DELETE
     def foo(resource_id):
-        assert 42 == resource_id
+        assert 42 == resource_id.value
 
     tp = DeleteSingleResourcePipelineRunner()
     tp.build_pipeline_state(raw_resource_id=42)

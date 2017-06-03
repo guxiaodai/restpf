@@ -29,7 +29,10 @@ class GetSingleResourceCallbackKwargsStateVariableMapper(
     CallbackKwargsStateVariableMapper
 ):
     ATTR2KWARG = {
-        'raw_resource_id': 'resource_id',
+        # raw submitted..
+        'raw_resource_id': 'raw_resource_id',
+        # parsed submitted.
+        'input_resource_id': 'resource_id',
     }
 
 
@@ -62,7 +65,7 @@ class GetSingleResourceRepresentationGenerator(RepresentationGenerator):
 
     def generate_representation(self, resource):
         return {
-            'id': self.raw_resource_id,
+            'id': self.input_resource_id.value,
             'type': resource.name,
             'attributes': self.output_attributes.serialize(),
             'relationships': self.output_relationships.serialize(),

@@ -139,6 +139,8 @@ class PipelineBase(ProxyStateOperator):
     '''
 
     PROXY_ATTRS = [
+        'resource',
+
         *_INPUT_STATE_NAMES,
         *_INTERNAL_STATE_NAMES,
         *_OUTPUT_STATE_NAMES,
@@ -148,8 +150,12 @@ class PipelineBase(ProxyStateOperator):
         'representation',
     ]
 
+    def _bind_proxy_state(self, pipeline_state):
+        self.bind_proxy_state(pipeline_state)
+        self.pipeline_state = pipeline_state
+
     @method_named_args(
-        'pipeline_state',
+        ('pipeline_state', '_bind_proxy_state'),
         'resource',
         'context_rule',
         'state_builder',

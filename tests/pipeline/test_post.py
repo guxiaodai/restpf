@@ -35,7 +35,7 @@ async def test_simple_post():
     def a(submitted_resource_id, state, var_collector):
         called.append('a')
 
-        assert submitted_resource_id is None
+        assert submitted_resource_id.value is None
         assert 1 == state.b.c.value
         assert 2 == state.d.value
 
@@ -45,7 +45,7 @@ async def test_simple_post():
     def c(generated_resource_id, state):
         called.append('c')
 
-        assert 999 == generated_resource_id
+        assert 999 == generated_resource_id.value
         assert 1 == state.value
 
     tp = PostSingleResourcePipelineRunner()
@@ -74,4 +74,5 @@ async def test_simple_post():
 
     # no order required.
     assert ['a', 'c'] == called
-    assert 999 == tp.pipeline_state.var_collector['generated_resource_id']
+    assert 999 == \
+        tp.pipeline_state.var_collector['generated_resource_id'].value
