@@ -2,6 +2,7 @@ import json
 
 from restpf.utils.constants import HTTPMethodConfig
 from restpf.web.sanic import SanicDriver
+from restpf.web.base import RestPFGlobalNamespace
 
 
 def test_basic_usage():
@@ -25,3 +26,13 @@ def test_basic_usage():
     _, response = driver.app.test_client.get('/foo/bar/2')
     assert 200 == response.status
     assert 42 == json.loads(response.text)['result']
+
+
+def test_global_namespace_operator():
+    driver = SanicDriver()
+
+    driver.create_global_namespace()
+    RestPFGlobalNamespace.set('testname', 42)
+    assert 42 == RestPFGlobalNamespace.get('testname')
+    driver.destroy_global_namespace()
+    assert None is RestPFGlobalNamespace.get('testname')

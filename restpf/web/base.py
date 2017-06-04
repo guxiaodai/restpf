@@ -17,6 +17,28 @@ Defines the interfaces of web framework engine.
 '''
 
 
+class RestPFGlobalNamespace:
+
+    @classmethod
+    def register_namespace_operator(cls, namespace_operator):
+        cls._namespace_operator = namespace_operator
+
+    @classmethod
+    def unregister_namespace_operator(cls):
+        cls._namespace_operator = None
+
+    @classmethod
+    def get(cls, name):
+        if cls._namespace_operator is None:
+            return None
+        return cls._namespace_operator.global_namespace_accessor(name)
+
+    @classmethod
+    def set(cls, name, value):
+        cls._namespace_operator.global_namespace_mutator(name, value)
+
+
+# TODO: review the interface design.
 class WebFrameworkDriverInterface:
 
     def register_endpoint(self,

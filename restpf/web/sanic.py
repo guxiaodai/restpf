@@ -1,8 +1,12 @@
+import types
 import itertools
 from inspect import Signature, Parameter
 
 from restpf.utils.helper_functions import to_iterable
-from .base import WebFrameworkDriverInterface
+from .base import (
+    WebFrameworkDriverInterface,
+    RestPFGlobalNamespace,
+)
 
 from sanic import Sanic
 from sanic import response
@@ -74,13 +78,25 @@ class SanicDriver(WebFrameworkDriverInterface):
         return sanic_callback_wrapper
 
     def create_global_namespace(self):
-        pass
+        # by injecting a SimpleNamespace to self.app
+        self.app._restpf_global_namespace = types.SimpleNamespace()
+        # register to global namespace handler.
+        RestPFGlobalNamespace.register_namespace_operator(self)
+
+    def destroy_global_namespace(self):
+        RestPFGlobalNamespace.unregister_namespace_operator()
 
     def global_namespace_accessor(self, name):
-        pass
+        return getattr(
+            self.app._restpf_global_namespace,
+            name, None,
+        )
 
     def global_namespace_mutator(self, name, value):
-        pass
+        setattr(
+            self.app._restpf_global_namespace,
+            name, value,
+        )
 
     def before_server_start(self, name, callback):
         pass
